@@ -1,0 +1,18 @@
+# push v* tag → GitHub Release 页面（打 tag 仍须手工或 promote 后操作）
+# 说明见 workers-world/worker-actions docs/gh-release.md
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: workers-world/worker-actions/.github/workflows/create-gh-release.yml@actions/v0.1.2
+    secrets: inherit
+    with:
+      tag_name: ${{ github.ref_name }}

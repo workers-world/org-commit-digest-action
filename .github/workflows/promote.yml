@@ -1,0 +1,28 @@
+name: Promote to master
+
+# Validate 绿 → 开/复用 Release PR → auto merge（禁止直推 master）。
+# 由 worker-promote 执行；须 Org Secret WORKERS_WORLD_GHA_TOKEN（GHA_TOKEN）。
+on:
+  workflow_run:
+    workflows: ["Validate action"]
+    types: [completed]
+    branches: ["dev_*"]
+  workflow_dispatch:
+    inputs:
+      release_branch:
+        description: 要 promote 的发布轨分支（如 dev_00_01_00）
+        required: true
+        type: string
+
+jobs:
+  promote:
+    permissions: {}
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'dev_'))
+    uses: workers-world/worker-actions/.github/workflows/worker-promote.yml@actions/v0.1.2
+    with:
+      release_branch: ${{ github.event_name == 'workflow_dispatch' && inputs.release_branch || github.event.workflow_run.head_branch }}
+    secrets: inherit

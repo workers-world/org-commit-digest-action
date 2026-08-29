@@ -1,0 +1,30 @@
+name: Weekly commit digest
+
+on:
+  schedule:
+    # Monday 08:00 Asia/Shanghai (UTC Monday 00:00)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate digest and notify
+        uses: ./
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.WORKERS_WORLD_GHA_TOKEN || secrets.GITHUB_TOKEN }}
+          NOTIFY_WORKER_URL: ${{ vars.NOTIFY_WORKER_URL }}
+          NOTIFY_AUTH_TOKEN: ${{ secrets.NOTIFY_GHA_TOKEN }}
+        with:
+          org: workers-world
+          exclude-file: exclude.txt
+          timezone: Asia/Shanghai
+          notify: true
+          upload-artifact: false
+          verbose: false

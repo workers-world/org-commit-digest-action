@@ -1,0 +1,26 @@
+name: Validate action
+
+on:
+  push:
+    branches: ["dev_*"]
+  pull_request:
+    branches: ["dev_*"]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check action metadata
+        run: |
+          set -euo pipefail
+          test -f action.yml
+          test -f digest.py
+          test -x digest.sh
+          grep -q 'name: Org commit digest' action.yml
+          grep -q 'workers-world/action-notify-email@v1' action.yml
+          python3 -m py_compile digest.py

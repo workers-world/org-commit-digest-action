@@ -1,0 +1,143 @@
+name: Org commit digest
+description: Scan GitHub org or single repo for commits and tags; optional notify email and artifact upload
+branding:
+  icon: git-commit
+  color: purple
+
+inputs:
+  org:
+    description: GitHub organization to scan (org mode)
+    required: false
+    default: ''
+  repo:
+    description: Single repo as owner/name or short name with org
+    required: false
+    default: ''
+  branch:
+    description: Branch to list commits from
+    required: false
+    default: master
+  timezone:
+    description: IANA timezone for since/until wall clock (e.g. Asia/Shanghai)
+    required: false
+    default: UTC
+  since:
+    description: Window start (YYYY-MM-DD or ISO); empty = 7 days ago in timezone
+    required: false
+    default: ''
+  until:
+    description: Window end; empty = now in timezone
+    required: false
+    default: ''
+  exclude-file:
+    description: File with repo names to skip (org mode only)
+    required: false
+    default: ''
+  exclude:
+    description: Comma-separated repo names to skip (org mode only)
+    required: false
+    default: ''
+  out:
+    description: Output markdown path when there is activity
+    required: false
+    default: digest.md
+  verbose:
+    description: Write digest to step summary (avoid on public self-run)
+    required: false
+    default: 'false'
+  notify:
+    description: Send email via action-notify-email when there is activity
+    required: false
+    default: 'true'
+  notify-to:
+    description: Override notify-worker DEFAULT_TO
+    required: false
+    default: ''
+  fail-on-notify-error:
+    description: Fail job when notify fails
+    required: false
+    default: 'true'
+  upload-artifact:
+    description: Upload digest.md as workflow artifact when there is activity
+    required: false
+    default: 'false'
+
+outputs:
+  digest-file:
+    description: Path to digest markdown; empty when no activity
+    value: ${{ steps.meta.outputs.digest-file }}
+  subject:
+    description: Suggested email subject; empty when no activity
+    value: ${{ steps.meta.outputs.subject }}
+  repo-count:
+    description: Repositories scanned (after exclude)
+    value: ${{ steps.meta.outputs.repo-count }}
+  active-count:
+    description: Repositories with commits or tags in window
+    value: ${{ steps.meta.outputs.active-count }}
+  scope:
+    description: org:NAME or repo:owner/name
+    value: ${{ steps.meta.outputs.scope }}
+
+runs:
+  using: composite
+  steps:
+    - id: scan
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        INPUT_ORG: ${{ inputs.org }}
+        INPUT_REPO: ${{ inputs.repo }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_TIMEZONE: ${{ inputs.timezone }}
+        INPUT_SINCE: ${{ inputs.since }}
+        INPUT_UNTIL: ${{ inputs.until }}
+        INPUT_EXCLUDE_FILE: ${{ inputs.exclude-file }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_OUT: ${{ inputs.out }}
+        INPUT_VERBOSE: ${{ inputs.verbose }}
+        GH_TOKEN: ${{ env.GH_TOKEN }}
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        python3 digest.py
+
+    - id: meta
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        if [ ! -f .digest-meta.json ]; then
+          echo "digest meta missing" >&2
+          exit 1
+        fi
+        python3 - <<'PY' >> "$GITHUB_OUTPUT"
+        import json
+        from pathlib import Path
+
+        data = json.loads(Path(".digest-meta.json").read_text(encoding="utf-8"))
+        for key in ("digest-file", "subject", "repo-count", "active-count", "scope"):
+            value = data.get(key, "")
+            print(f"{key}={value}")
+        PY
+
+    - name: Upload digest artifact
+      if: inputs.upload-artifact == 'true' && steps.meta.outputs.active-count != '0'
+      uses: actions/upload-artifact@v4
+      with:
+        name: commit-digest
+        path: ${{ github.action_path }}/${{ inputs.out }}
+        if-no-files-found: error
+
+    - name: Send digest email
+      if: inputs.notify == 'true' && steps.meta.outputs.active-count != '0'
+      uses: workers-world/action-notify-email@v1
+      with:
+        subject: ${{ steps.meta.outputs.subject }}
+        body-file: ${{ github.action_path }}/${{ inputs.out }}
+        to: ${{ inputs.notify-to }}
+        dedup-key: org-commit-digest-${{ steps.meta.outputs.scope }}-${{ steps.meta.outputs.subject }}
+        fail-on-error: ${{ inputs.fail-on-notify-error }}
+      env:
+        NOTIFY_WORKER_URL: ${{ env.NOTIFY_WORKER_URL }}
+        NOTIFY_AUTH_TOKEN: ${{ env.NOTIFY_AUTH_TOKEN }}
