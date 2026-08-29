@@ -1,7 +1,1 @@
 # workers-world org weekly digest exclusions (short repo names)
-cloudflare-os
-docs-site
-r2-image-transform-worker
-aws_hub_to_r2_worker
-cloudflare-docs
-framework_sdk_worker

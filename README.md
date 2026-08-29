@@ -2,8 +2,6 @@
 
 GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇总时间窗内指定分支上的 **commits** 与 **tags**，写出 `digest.md`；可选上传 Artifact 或通过 [action-notify-email](https://github.com/workers-world/action-notify-email) 发信。
 
-本仓在 `workers-world` org 内 **自跑周一 cron**（公开仓 Actions 额度），不占用 meta 仓 `cloudflare_work` 的 workflow 配额。
-
 ## 快速使用
 
 ### Org 扫描 + 发信
