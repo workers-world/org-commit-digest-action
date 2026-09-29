@@ -22,7 +22,7 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        startsWith(github.event.workflow_run.head_branch, 'dev_'))
-    uses: workers-world/worker-actions/.github/workflows/worker-promote.yml@actions/v0.1.2
+    uses: workers-world/worker-actions/.github/workflows/worker-promote.yml@actions/v0.2.3
     with:
       release_branch: ${{ github.event_name == 'workflow_dispatch' && inputs.release_branch || github.event.workflow_run.head_branch }}
     secrets: inherit
