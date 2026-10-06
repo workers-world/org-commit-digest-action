@@ -50,12 +50,13 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 | `org` / `repo` | | 扫描范围 |
 | `branch` | `master` | 列出 commits 的分支；该分支被改名（如 `master`→`dev_00_01_00`）时自动用新名，不存在则回退到仓库默认分支 |
 | `include-merges` | `false` | 是否在 Commits 里列出 merge commit（≥2 个 parent）；默认不列，减少 `Merge pull request` 噪音 |
+| `noise-filter` | `true` | 过滤可忽略的自动化噪声（action pin、SDK/lockfile bot、空 release 推广等）；`false` 时输出完整列表 |
 | `timezone` | `UTC` | IANA 时区，用于 `since`/`until` 墙钟 |
 | `since` | 7 天前 | `YYYY-MM-DD` 或无偏移 ISO；空则用 timezone 下 7 天前 |
 | `until` | 现在 | 同上 |
 | `exclude-file` | | 每行一个 repo 短名，`#` 注释 |
 | `exclude` | | 逗号分隔短名 |
-| `out` | `digest.md` | 有活动时写出 Markdown 正文；同目录生成 `.html`（如 `digest.html`）供 HTML 邮件 |
+| `out` | `digest.md` | 有活动时写出 Markdown 正文；同目录生成 `.html`（如 `digest.html`）与 `.csv`（如 `digest.csv`） |
 | `verbose` | `false` | 写入 step summary（公开自跑请保持 false） |
 | `notify` | `true` | 有活动时内嵌发信 |
 | `notify-to` | | 覆盖 notify-worker `DEFAULT_TO` |
@@ -80,7 +81,29 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 2. **按 repo 明细**：`Commits` 在前、`Tags` 在后；每行短 SHA、单行 subject（过长截断）、作者、按 `timezone` 格式化的日期。
 3. **发信**：`notify: true` 时 `body-file` 使用 Markdown 文件作纯文本 fallback，`html-file` 指向同次扫描生成的 HTML 文件（路径见 meta 的 `digest-html-file`，默认与 `out` 同主名、`.html` 后缀）；**另附** `commit-digest.csv`（路径见 `digest-csv-file`，默认与 `out` 同主名、`.csv` 后缀），列含窗口、repo、type（commit|tag）、sha、name/subject、author、date，便于在表格中筛选。大 HTML/CSV 不经 `GITHUB_OUTPUT` 内联，避免 `Argument list too long` 与日志泄露正文。`verbose: false` 时日志仍只打印 `digest written: ...`。
 
-后续 phase 可能增加可配置的 CI/依赖 bump 过滤；当前版本不做 subject 过滤。
+### 噪声过滤（`noise-filter`，默认开启）
+
+对 **digest.md / digest.html / digest.csv** 使用同一套规则（first match wins），Summary 计数与明细一致。关闭：`noise-filter: false` 可恢复未过滤的完整 dump。
+
+| 规则 | 典型模式 |
+|------|----------|
+| R1 | `chore(ci): bump worker-actions … actions/v*`、模板 pin 对齐 |
+| R2 | Cloudflare npm / `compatibility_date` 自动 bump |
+| R3 | `chore(deps): bump framework_sdk_*` |
+| R4 | 仅改 lockfile（含 bot 刷新 package-lock） |
+| R5 | dependabot/renovate、窄依赖 bump |
+| R6 | `ci: retrigger` |
+| R7 | qodana / `.gitignore` 等工具配置 |
+| R8 | 仅改 `wrangler.toml/json(c)` 的 trivial app config |
+| R9 | `align RELEASE_BRANCH with current dev line` |
+| R10 | `release: dev_* → master` 空提交、仅 package/lock/.github、或与同仓窗口内其它提交文件重复 |
+| T1 | 浮动主版本 tag（`v1`、`prefix/v2`）；保留 `v1.2.3`、`actions/v0.2.12` |
+
+**保留（不确定时 KEEP）**：WW-45 Issues 扇出、zizmor secrets-inherit、Smart Placement、带真实 src 的 release、人工 CVE 修复、sch1 证据 bot、文档类 deployment 更新等。
+
+R4/R8/R10 会调用 GitHub **commit files** API（与 digest 相同 `GH_TOKEN`），单次 run 内缓存；文件列表不可用时 **fail-open（保留）**，避免误删业务提交。
+
+`verbose: true` 时 stderr 打印各规则忽略条数（不含 subject）；`verbose: false` 时仅一行 dropped 总数，避免公开日志泄露提交标题。
 
 ## 空窗行为
 

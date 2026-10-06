@@ -1,0 +1,14 @@
+window_since,window_until,timezone,repo,type,sha,name,author,date,ignore_reason
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,befcd25,chore: bump Cloudflare npm deps to latest (#87),ZEROWORLD,2026-10-05,R2 cf_deps_autobump
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,86f7a95,chore(ci): bump worker-actions bundle to actions/v0.2.12,ongoing-z,2026-10-05,R1 ci_action_pin_bump
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,ea869bb,更新依赖版本。,ongoing-z,2026-10-04,R5 dep_bot
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,1c8c985,chore(deps): bump framework_sdk_worker to 0.4.33,ongoing-z,2026-10-04,R3 sdk_dep_bump
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,265d533,release: dev_00_15_00 → master (#77),ZEROWORLD,2026-10-01,R10a release_promote_empty
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,85cbdd5,release: dev_00_15_00 → master (#74),ZEROWORLD,2026-10-01,R10c release_promote_duplicate
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,de9edec,CI action 自动刷新 package-lock（GitHub Packages SDK 0.4.31）,github-actions[bot],2026-10-01,R4 lockfile_only
+2026-09-29,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,e764dbc,release: dev_00_14_00 → master (#69),ZEROWORLD,2026-09-30,R10b release_promote_noise_only
+2026-09-29,2026-10-06,Asia/Shanghai,email-rule-worker,commit,e4a64a6,ci: retrigger after runner env fix (xz + ~/.local/lib),dev-bot,2026-10-01,R6 ci_retrigger
+2026-09-29,2026-10-06,Asia/Shanghai,fund-info-worker,commit,40d79ee,chore: gitignore 忽略 __pycache__。,ongoing-z,2026-09-30,R7 tooling_ignore_config
+2026-09-29,2026-10-06,Asia/Shanghai,counter-worker,commit,1dae60f,fix: align RELEASE_BRANCH with current dev line dev_00_12_00 (#30),ZEROWORLD,2026-10-06,R9 release_branch_align
+2026-09-29,2026-10-06,Asia/Shanghai,key1,commit,0d76e66,update app config,ongoing-z,2026-10-06,R8 trivial_app_config
+2026-09-29,2026-10-06,Asia/Shanghai,action-notify-email,tag,37f6acc,v1,,2026-10-06,T1 floating_major_tag
