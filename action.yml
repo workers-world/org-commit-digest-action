@@ -29,6 +29,10 @@ inputs:
     description: Window end; empty = now in timezone
     required: false
     default: ''
+  include-merges:
+    description: Include merge commits (2+ parents) in the Commits list
+    required: false
+    default: 'false'
   exclude-file:
     description: File with repo names to skip (org mode only)
     required: false
@@ -96,6 +100,7 @@ runs:
         INPUT_EXCLUDE: ${{ inputs.exclude }}
         INPUT_OUT: ${{ inputs.out }}
         INPUT_VERBOSE: ${{ inputs.verbose }}
+        INPUT_INCLUDE_MERGES: ${{ inputs.include-merges }}
         GH_TOKEN: ${{ env.GH_TOKEN }}
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       run: |
