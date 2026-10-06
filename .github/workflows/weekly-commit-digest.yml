@@ -18,7 +18,7 @@ jobs:
       - name: Generate digest and notify
         uses: ./
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.WORKERS_WORLD_GHA_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TOKEN_READ_ORG_COMMIT || secrets.GH_TOKEN || secrets.WORKERS_WORLD_GHA_TOKEN || secrets.GITHUB_TOKEN }}
           NOTIFY_WORKER_URL: ${{ vars.NOTIFY_WORKER_URL }}
           NOTIFY_AUTH_TOKEN: ${{ secrets.NOTIFY_GHA_TOKEN }}
         with:
