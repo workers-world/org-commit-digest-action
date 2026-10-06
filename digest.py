@@ -3,15 +3,20 @@
 
 from __future__ import annotations
 
+import csv
 import html
+from io import StringIO
 import json
 import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+import noise_filter
 
 
 META_FILE = ".digest-meta.json"
@@ -550,6 +555,102 @@ def html_path_for_digest(out_file: str) -> Path:
     return path.with_name(f"{path.name}.html")
 
 
+def csv_path_for_digest(out_file: str) -> Path:
+    path = Path(out_file)
+    if path.suffix:
+        return path.with_suffix(".csv")
+    return path.with_name(f"{path.name}.csv")
+
+
+class CommitFilesCache:
+    """Per-run cache for GET /repos/{o}/{r}/commits/{sha} file lists."""
+
+    def __init__(self) -> None:
+        self._cache: dict[tuple[str, str, str], list[str] | None] = {}
+
+    def get(self, owner: str, name: str, sha: str) -> list[str] | None:
+        key = (owner, name, sha)
+        if key in self._cache:
+            return self._cache[key]
+        try:
+            data = gh_json(f"repos/{owner}/{name}/commits/{sha}")
+        except RuntimeError:
+            self._cache[key] = None
+            return None
+        files: list[str] = []
+        if isinstance(data, dict):
+            for entry in data.get("files") or []:
+                if isinstance(entry, dict) and entry.get("filename"):
+                    files.append(str(entry["filename"]))
+        self._cache[key] = files
+        return files
+
+
+def log_noise_filter_stats(ignored: Counter[str], *, verbose: bool) -> None:
+    total = sum(ignored.values())
+    if total == 0:
+        return
+    commits_dropped = total  # tags included in total; stderr stays subject-free
+    eprint(f"noise-filter: dropped {commits_dropped} items")
+    if verbose:
+        for reason in sorted(ignored):
+            eprint(f"noise-filter:   {ignored[reason]} {reason}")
+
+
+def build_digest_csv(
+    since_label: str,
+    until_label: str,
+    tz_name: str,
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> str:
+    rows: list[dict[str, str]] = []
+    for repo_name, commits, tags in sections:
+        for row in commits:
+            rows.append(
+                {
+                    "window_since": since_label,
+                    "window_until": until_label,
+                    "timezone": tz_name,
+                    "repo": repo_name,
+                    "type": "commit",
+                    "sha": row["sha"],
+                    "name": row["message"],
+                    "author": row["author"],
+                    "date": row["date"],
+                }
+            )
+        for row in tags:
+            rows.append(
+                {
+                    "window_since": since_label,
+                    "window_until": until_label,
+                    "timezone": tz_name,
+                    "repo": repo_name,
+                    "type": "tag",
+                    "sha": row["sha"],
+                    "name": row["name"],
+                    "author": "",
+                    "date": row["date"],
+                }
+            )
+    fieldnames = [
+        "window_since",
+        "window_until",
+        "timezone",
+        "repo",
+        "type",
+        "sha",
+        "name",
+        "author",
+        "date",
+    ]
+    buf = StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return buf.getvalue()
+
+
 def write_meta(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -574,6 +675,7 @@ def main() -> int:
     out_file = os.environ.get("INPUT_OUT", "digest.md") or "digest.md"
     verbose = os.environ.get("INPUT_VERBOSE", "false").lower() == "true"
     include_merges = os.environ.get("INPUT_INCLUDE_MERGES", "false").lower() == "true"
+    noise_filter_enabled = os.environ.get("INPUT_NOISE_FILTER", "true").lower() != "false"
 
     since, until, since_label, until_label = resolve_window(since_raw, until_raw, tz_name)
     scope, repo_names = resolve_repos(org, repo)
@@ -612,6 +714,17 @@ def main() -> int:
         if commit_failures == scanned:
             raise SystemExit("commit listing failed for every scanned repo; refusing to send a tag-only digest")
 
+    if noise_filter_enabled and sections:
+        files_cache = CommitFilesCache()
+        sections, ignored_counts = noise_filter.filter_digest_rows(
+            org,
+            sections,
+            fetch_files=files_cache.get,
+            repo_owner_name=repo_owner_name,
+        )
+        log_noise_filter_stats(ignored_counts, verbose=verbose)
+        active = len(sections)
+
     meta_path = Path(META_FILE)
     if active == 0:
         message = f"no activity in window {since_label}..{until_label} {tz_name} ({scanned} repos scanned)"
@@ -633,15 +746,19 @@ def main() -> int:
 
     digest_text = build_digest(scope, since_label, until_label, tz_name, sections)
     html_file = html_path_for_digest(out_file)
+    csv_file = csv_path_for_digest(out_file)
     digest_html = build_digest_html(scope, since_label, until_label, tz_name, sections)
+    digest_csv = build_digest_csv(since_label, until_label, tz_name, sections)
     Path(out_file).write_text(digest_text, encoding="utf-8")
     html_file.write_text(digest_html, encoding="utf-8")
+    csv_file.write_text(digest_csv, encoding="utf-8")
     subject = f"[{scope.split(':', 1)[-1]}] weekly digest {since_label}..{until_label}"
     write_meta(
         meta_path,
         {
             "digest-file": out_file,
             "digest-html-file": str(html_file),
+            "digest-csv-file": str(csv_file),
             "subject": subject,
             "repo-count": scanned,
             "active-count": active,
