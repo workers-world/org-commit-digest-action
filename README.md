@@ -9,7 +9,8 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 ```yaml
 - uses: workers-world/org-commit-digest-action@v1
   env:
-    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 或 org PAT
+    # Org Secret TOKEN_READ_ORG_COMMIT：PAT 需 repo + read:org，或 fine-grained 对目标 org 全部仓 Contents+Metadata Read
+    GH_TOKEN: ${{ secrets.TOKEN_READ_ORG_COMMIT }}
     NOTIFY_WORKER_URL: ${{ vars.NOTIFY_WORKER_URL }}
     NOTIFY_AUTH_TOKEN: ${{ secrets.NOTIFY_GHA_TOKEN }}
   with:
@@ -92,7 +93,8 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 
 | 名称 | 说明 |
 |------|------|
-| `GH_TOKEN` / `GITHUB_TOKEN` | `gh` CLI；org 扫描需能 `repo list` + 读 commit |
+| `GH_TOKEN` / `GITHUB_TOKEN` | 传给 action 的 env；`gh` CLI 使用。Org 扫描请在 workflow 里设 `GH_TOKEN: ${{ secrets.TOKEN_READ_ORG_COMMIT }}`（PAT：`repo` + `read:org`，或 fine-grained 全仓 Contents+Metadata Read）。单仓可用 `GITHUB_TOKEN` |
+| `TOKEN_READ_ORG_COMMIT` | **Org Secret 名**（非 action 直接读取）；weekly digest / org 扫描用其值注入 `GH_TOKEN` |
 | `NOTIFY_WORKER_URL` | `notify: true` 时必填（Org Variable） |
 | `NOTIFY_AUTH_TOKEN` | 与 notify-worker `NOTIFY_GHA_TOKEN` 同值 |
 
@@ -102,7 +104,7 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 
 - cron `0 0 * * 1`（周一 08:00 上海）
 - `uses: ./`，`org: workers-world`，`exclude-file: exclude.txt`
-- Secrets：`WORKERS_WORLD_GHA_TOKEN` 或 `GH_TOKEN`、`NOTIFY_GHA_TOKEN`
+- Secrets：`TOKEN_READ_ORG_COMMIT`（org 读 PAT，注入 `GH_TOKEN`）、`NOTIFY_GHA_TOKEN`
 
 ## 本地调试
 
