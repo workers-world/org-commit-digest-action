@@ -141,7 +141,7 @@ runs:
         subject: ${{ steps.meta.outputs.subject }}
         body-file: ${{ github.action_path }}/${{ inputs.out }}
         to: ${{ inputs.notify-to }}
-        dedup-key: org-commit-digest-${{ steps.meta.outputs.scope }}-${{ steps.meta.outputs.subject }}
+        dedup-key: org-commit-digest-${{ steps.meta.outputs.scope }}-${{ steps.meta.outputs.subject }}-${{ github.run_id }}
         fail-on-error: ${{ inputs.fail-on-notify-error }}
       env:
         NOTIFY_WORKER_URL: ${{ env.NOTIFY_WORKER_URL }}
