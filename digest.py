@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import csv
 import html
+import io
 import json
 import os
 import re
@@ -403,6 +405,16 @@ def active_sections(
     return [(name, commits, tags) for name, commits, tags in sections if commits or tags]
 
 
+def sort_sections(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> list[tuple[str, list[dict[str, str]], list[dict[str, str]]]]:
+    """Order repos by commit count (desc), then tag count (desc), then name."""
+    return sorted(
+        active_sections(sections),
+        key=lambda item: (-len(item[1]), -len(item[2]), item[0].casefold()),
+    )
+
+
 def format_commit_line(row: dict[str, str]) -> str:
     subject = truncate_subject(row["message"])
     return f"- `{row['sha']}` {subject} — {row['author']} ({row['date']})"
@@ -415,7 +427,7 @@ def digest_title(scope: str, since_label: str, until_label: str, tz_name: str) -
 def build_summary_rows(
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
 ) -> list[tuple[str, int, int]]:
-    return [(name, len(commits), len(tags)) for name, commits, tags in active_sections(sections)]
+    return [(name, len(commits), len(tags)) for name, commits, tags in sort_sections(sections)]
 
 
 def build_summary_text(
@@ -445,7 +457,7 @@ def build_repo_sections_text(
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
 ) -> str:
     lines: list[str] = []
-    for repo_name, commits, tags in active_sections(sections):
+    for repo_name, commits, tags in sort_sections(sections):
         lines.append(f"## {repo_name}")
         lines.append("")
         if commits:
@@ -517,7 +529,7 @@ def build_digest_html(
         "<hr>",
     ]
 
-    for repo_name, commits, tags in active_sections(sections):
+    for repo_name, commits, tags in sort_sections(sections):
         body_parts.append(f"<h2 style=\"font-size: 1.05rem; margin-top: 1.25rem;\">{html.escape(repo_name)}</h2>")
         if commits:
             body_parts.append(f"<h3 style=\"font-size: 0.95rem;\">Commits ({len(commits)})</h3><ul>")
@@ -548,6 +560,58 @@ def html_path_for_digest(out_file: str) -> Path:
     if path.suffix:
         return path.with_suffix(".html")
     return path.with_name(f"{path.name}.html")
+
+
+def csv_path_for_digest(out_file: str) -> Path:
+    path = Path(out_file)
+    if path.suffix:
+        return path.with_suffix(".csv")
+    return path.with_name(f"{path.name}.csv")
+
+
+def build_digest_csv(
+    since_label: str,
+    until_label: str,
+    tz_name: str,
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(
+        ["window_since", "window_until", "timezone", "repo", "type", "sha", "name", "author", "date"]
+    )
+    window_since = since_label
+    window_until = until_label
+    for repo_name, commits, tags in sort_sections(sections):
+        for row in commits:
+            writer.writerow(
+                [
+                    window_since,
+                    window_until,
+                    tz_name,
+                    repo_name,
+                    "commit",
+                    row["sha"],
+                    row["message"],
+                    row["author"],
+                    row["date"],
+                ]
+            )
+        for row in tags:
+            writer.writerow(
+                [
+                    window_since,
+                    window_until,
+                    tz_name,
+                    repo_name,
+                    "tag",
+                    row["sha"],
+                    row["name"],
+                    "",
+                    row["date"],
+                ]
+            )
+    return buffer.getvalue()
 
 
 def write_meta(path: Path, payload: dict[str, object]) -> None:
@@ -633,15 +697,19 @@ def main() -> int:
 
     digest_text = build_digest(scope, since_label, until_label, tz_name, sections)
     html_file = html_path_for_digest(out_file)
+    csv_file = csv_path_for_digest(out_file)
     digest_html = build_digest_html(scope, since_label, until_label, tz_name, sections)
+    digest_csv = build_digest_csv(since_label, until_label, tz_name, sections)
     Path(out_file).write_text(digest_text, encoding="utf-8")
     html_file.write_text(digest_html, encoding="utf-8")
+    csv_file.write_text(digest_csv, encoding="utf-8")
     subject = f"[{scope.split(':', 1)[-1]}] weekly digest {since_label}..{until_label}"
     write_meta(
         meta_path,
         {
             "digest-file": out_file,
             "digest-html-file": str(html_file),
+            "digest-csv-file": str(csv_file),
             "subject": subject,
             "repo-count": scanned,
             "active-count": active,

@@ -17,6 +17,11 @@ class ActionYmlNotifyWiringTests(unittest.TestCase):
     def test_meta_exports_digest_html_file_path(self) -> None:
         self.assertIn('"digest-html-file"', self.action_yml)
 
+    def test_notify_passes_csv_attachment_file(self) -> None:
+        self.assertIn("attachment-file:", self.action_yml)
+        self.assertIn("steps.meta.outputs.digest-csv-file", self.action_yml)
+        self.assertIn("attachment-filename: commit-digest.csv", self.action_yml)
+
 
 if __name__ == "__main__":
     unittest.main()
