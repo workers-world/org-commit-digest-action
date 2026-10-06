@@ -11,9 +11,12 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+import noise_filter
 
 
 META_FILE = ".digest-meta.json"
@@ -569,6 +572,41 @@ def csv_path_for_digest(out_file: str) -> Path:
     return path.with_name(f"{path.name}.csv")
 
 
+class CommitFilesCache:
+    """Per-run cache for GET /repos/{o}/{r}/commits/{sha} file lists."""
+
+    def __init__(self) -> None:
+        self._cache: dict[tuple[str, str, str], list[str] | None] = {}
+
+    def get(self, owner: str, name: str, sha: str) -> list[str] | None:
+        key = (owner, name, sha)
+        if key in self._cache:
+            return self._cache[key]
+        try:
+            data = gh_json(f"repos/{owner}/{name}/commits/{sha}")
+        except RuntimeError:
+            self._cache[key] = None
+            return None
+        files: list[str] = []
+        if isinstance(data, dict):
+            for entry in data.get("files") or []:
+                if isinstance(entry, dict) and entry.get("filename"):
+                    files.append(str(entry["filename"]))
+        self._cache[key] = files
+        return files
+
+
+def log_noise_filter_stats(ignored: Counter[str], *, verbose: bool) -> None:
+    total = sum(ignored.values())
+    if total == 0:
+        return
+    commits_dropped = total  # tags included in total; stderr stays subject-free
+    eprint(f"noise-filter: dropped {commits_dropped} items")
+    if verbose:
+        for reason in sorted(ignored):
+            eprint(f"noise-filter:   {ignored[reason]} {reason}")
+
+
 def build_digest_csv(
     since_label: str,
     until_label: str,
@@ -638,6 +676,7 @@ def main() -> int:
     out_file = os.environ.get("INPUT_OUT", "digest.md") or "digest.md"
     verbose = os.environ.get("INPUT_VERBOSE", "false").lower() == "true"
     include_merges = os.environ.get("INPUT_INCLUDE_MERGES", "false").lower() == "true"
+    noise_filter_enabled = os.environ.get("INPUT_NOISE_FILTER", "true").lower() != "false"
 
     since, until, since_label, until_label = resolve_window(since_raw, until_raw, tz_name)
     scope, repo_names = resolve_repos(org, repo)
@@ -675,6 +714,17 @@ def main() -> int:
         eprint(f"warn: commit listing failed for {commit_failures}/{scanned} repos")
         if commit_failures == scanned:
             raise SystemExit("commit listing failed for every scanned repo; refusing to send a tag-only digest")
+
+    if noise_filter_enabled and sections:
+        files_cache = CommitFilesCache()
+        sections, ignored_counts = noise_filter.filter_digest_rows(
+            org,
+            sections,
+            fetch_files=files_cache.get,
+            repo_owner_name=repo_owner_name,
+        )
+        log_noise_filter_stats(ignored_counts, verbose=verbose)
+        active = len(sections)
 
     meta_path = Path(META_FILE)
     if active == 0:
