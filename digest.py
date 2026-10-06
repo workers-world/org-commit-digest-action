@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import os
 import re
@@ -14,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 
 META_FILE = ".digest-meta.json"
+SUBJECT_MAX_LEN = 72
 
 
 def eprint(*args: object) -> None:
@@ -386,6 +388,79 @@ def _list_tags_graphql(
     return rows
 
 
+def truncate_subject(message: str, max_len: int = SUBJECT_MAX_LEN) -> str:
+    one_line = " ".join(message.split())
+    if len(one_line) <= max_len:
+        return one_line
+    if max_len <= 1:
+        return one_line[:max_len]
+    return one_line[: max_len - 1].rstrip() + "…"
+
+
+def active_sections(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> list[tuple[str, list[dict[str, str]], list[dict[str, str]]]]:
+    return [(name, commits, tags) for name, commits, tags in sections if commits or tags]
+
+
+def format_commit_line(row: dict[str, str]) -> str:
+    subject = truncate_subject(row["message"])
+    return f"- `{row['sha']}` {subject} — {row['author']} ({row['date']})"
+
+
+def digest_title(scope: str, since_label: str, until_label: str, tz_name: str) -> str:
+    return f"Commit digest: {scope} ({since_label} .. {until_label} {tz_name})"
+
+
+def build_summary_rows(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> list[tuple[str, int, int]]:
+    return [(name, len(commits), len(tags)) for name, commits, tags in active_sections(sections)]
+
+
+def build_summary_text(
+    since_label: str,
+    until_label: str,
+    tz_name: str,
+    summary_rows: list[tuple[str, int, int]],
+) -> str:
+    total_commits = sum(c for _, c, _ in summary_rows)
+    total_tags = sum(t for _, _, t in summary_rows)
+    lines = [
+        "## Summary",
+        "",
+        f"Window: **{since_label} .. {until_label}** ({tz_name})",
+        f"Repos with activity: **{len(summary_rows)}** · Commits: **{total_commits}** · Tags: **{total_tags}**",
+        "",
+        "| Repo | Commits | Tags |",
+        "| --- | ---: | ---: |",
+    ]
+    for repo_name, commit_count, tag_count in summary_rows:
+        lines.append(f"| {repo_name} | {commit_count} | {tag_count} |")
+    lines.extend(["", "---", ""])
+    return "\n".join(lines)
+
+
+def build_repo_sections_text(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> str:
+    lines: list[str] = []
+    for repo_name, commits, tags in active_sections(sections):
+        lines.append(f"## {repo_name}")
+        lines.append("")
+        if commits:
+            lines.append(f"### Commits ({len(commits)})")
+            for row in commits:
+                lines.append(format_commit_line(row))
+            lines.append("")
+        if tags:
+            lines.append(f"### Tags ({len(tags)})")
+            for row in tags:
+                lines.append(f"- `{row['name']}` → `{row['sha']}` ({row['date']})")
+            lines.append("")
+    return "\n".join(lines).rstrip() + ("\n" if lines else "")
+
+
 def build_digest(
     scope: str,
     since_label: str,
@@ -393,26 +468,86 @@ def build_digest(
     tz_name: str,
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
 ) -> str:
-    lines = [
-        f"# Commit digest: {scope} ({since_label} .. {until_label} {tz_name})",
+    summary_rows = build_summary_rows(sections)
+    parts = [
+        f"# {digest_title(scope, since_label, until_label, tz_name)}",
         "",
+        build_summary_text(since_label, until_label, tz_name, summary_rows).rstrip(),
+        build_repo_sections_text(sections).rstrip(),
     ]
-    for repo_name, commits, tags in sections:
-        if not commits and not tags:
-            continue
-        lines.append(f"## {repo_name}")
-        lines.append("")
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def build_digest_html(
+    scope: str,
+    since_label: str,
+    until_label: str,
+    tz_name: str,
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> str:
+    summary_rows = build_summary_rows(sections)
+    total_commits = sum(c for _, c, _ in summary_rows)
+    total_tags = sum(t for _, _, t in summary_rows)
+    title = html.escape(digest_title(scope, since_label, until_label, tz_name))
+    window = html.escape(f"{since_label} .. {until_label} ({tz_name})")
+
+    summary_table = [
+        "<table>",
+        "<thead><tr><th align=\"left\">Repo</th><th align=\"right\">Commits</th><th align=\"right\">Tags</th></tr></thead>",
+        "<tbody>",
+    ]
+    for repo_name, commit_count, tag_count in summary_rows:
+        summary_table.append(
+            f"<tr><td>{html.escape(repo_name)}</td>"
+            f"<td align=\"right\">{commit_count}</td>"
+            f"<td align=\"right\">{tag_count}</td></tr>"
+        )
+    summary_table.extend(["</tbody>", "</table>"])
+
+    body_parts = [
+        "<!DOCTYPE html>",
+        "<html>",
+        "<head><meta charset=\"utf-8\"></head>",
+        "<body style=\"font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.45; color: #1f2328;\">",
+        f"<h1 style=\"font-size: 1.25rem;\">{title}</h1>",
+        f"<p><strong>Window:</strong> {window}<br>",
+        f"<strong>Repos with activity:</strong> {len(summary_rows)} · "
+        f"<strong>Commits:</strong> {total_commits} · <strong>Tags:</strong> {total_tags}</p>",
+        "\n".join(summary_table),
+        "<hr>",
+    ]
+
+    for repo_name, commits, tags in active_sections(sections):
+        body_parts.append(f"<h2 style=\"font-size: 1.05rem; margin-top: 1.25rem;\">{html.escape(repo_name)}</h2>")
         if commits:
-            lines.append(f"### Commits ({len(commits)})")
+            body_parts.append(f"<h3 style=\"font-size: 0.95rem;\">Commits ({len(commits)})</h3><ul>")
             for row in commits:
-                lines.append(f"- `{row['sha']}` {row['message']} — {row['author']} ({row['date']})")
-            lines.append("")
+                subject = html.escape(truncate_subject(row["message"]))
+                author = html.escape(row["author"])
+                sha = html.escape(row["sha"])
+                date = html.escape(row["date"])
+                body_parts.append(
+                    f"<li><code>{sha}</code> {subject} — {author} ({date})</li>"
+                )
+            body_parts.append("</ul>")
         if tags:
-            lines.append(f"### Tags ({len(tags)})")
+            body_parts.append(f"<h3 style=\"font-size: 0.95rem;\">Tags ({len(tags)})</h3><ul>")
             for row in tags:
-                lines.append(f"- `{row['name']}` → `{row['sha']}` ({row['date']})")
-            lines.append("")
-    return "\n".join(lines).rstrip() + "\n"
+                name = html.escape(row["name"])
+                sha = html.escape(row["sha"])
+                date = html.escape(row["date"])
+                body_parts.append(f"<li><code>{name}</code> → <code>{sha}</code> ({date})</li>")
+            body_parts.append("</ul>")
+
+    body_parts.extend(["</body>", "</html>"])
+    return "\n".join(body_parts) + "\n"
+
+
+def html_path_for_digest(out_file: str) -> Path:
+    path = Path(out_file)
+    if path.suffix:
+        return path.with_suffix(".html")
+    return path.with_name(f"{path.name}.html")
 
 
 def write_meta(path: Path, payload: dict[str, object]) -> None:
@@ -497,12 +632,16 @@ def main() -> int:
         return 0
 
     digest_text = build_digest(scope, since_label, until_label, tz_name, sections)
+    html_file = html_path_for_digest(out_file)
+    digest_html = build_digest_html(scope, since_label, until_label, tz_name, sections)
     Path(out_file).write_text(digest_text, encoding="utf-8")
+    html_file.write_text(digest_html, encoding="utf-8")
     subject = f"[{scope.split(':', 1)[-1]}] weekly digest {since_label}..{until_label}"
     write_meta(
         meta_path,
         {
             "digest-file": out_file,
+            "digest-html-file": str(html_file),
             "subject": subject,
             "repo-count": scanned,
             "active-count": active,

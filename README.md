@@ -1,6 +1,6 @@
 # org-commit-digest-action
 
-GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇总时间窗内指定分支上的 **commits** 与 **tags**，写出 `digest.md`；可选上传 Artifact 或通过 [action-notify-email](https://github.com/workers-world/action-notify-email) 发信。
+GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇总时间窗内指定分支上的 **commits** 与 **tags**，写出 `digest.md`（Markdown 纯文本正文）与配套的 `digest.html`；可选上传 Artifact 或通过 [action-notify-email](https://github.com/workers-world/action-notify-email) 同时发送 **text + HTML** 邮件。
 
 ## 快速使用
 
@@ -55,7 +55,7 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 | `until` | 现在 | 同上 |
 | `exclude-file` | | 每行一个 repo 短名，`#` 注释 |
 | `exclude` | | 逗号分隔短名 |
-| `out` | `digest.md` | 有活动时写出 |
+| `out` | `digest.md` | 有活动时写出 Markdown 正文；同目录生成 `.html`（如 `digest.html`）供 HTML 邮件 |
 | `verbose` | `false` | 写入 step summary（公开自跑请保持 false） |
 | `notify` | `true` | 有活动时内嵌发信 |
 | `notify-to` | | 覆盖 notify-worker `DEFAULT_TO` |
@@ -71,6 +71,16 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 | `repo-count` | 扫描 repo 数（exclude 后） |
 | `active-count` | 窗内有 commit 或 tag 的 repo 数 |
 | `scope` | `org:NAME` 或 `repo:owner/name` |
+
+## 邮件模板
+
+有活动时生成的 digest 结构：
+
+1. **Summary（邮件顶部）**：时间窗（`since .. until` + `timezone`）、有活动的 repo 数、总 commit/tag 数，以及每个 repo 的 commit/tag **数量表**（无活动的 repo 不出现）。
+2. **按 repo 明细**：`Commits` 在前、`Tags` 在后；每行短 SHA、单行 subject（过长截断）、作者、按 `timezone` 格式化的日期。
+3. **发信**：`notify: true` 时 `body-file` 使用 Markdown 文件作纯文本 fallback，`html` 传入同次扫描生成的 HTML 文件内容；`verbose: false` 时日志仍只打印 `digest written: ...`，不会把正文写入 Actions log。
+
+后续 phase 可能增加可配置的 CI/依赖 bump 过滤；当前版本不做 subject 过滤。
 
 ## 空窗行为
 
