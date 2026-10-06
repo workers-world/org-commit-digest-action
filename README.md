@@ -48,7 +48,8 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 | 名称 | 默认 | 说明 |
 |------|------|------|
 | `org` / `repo` | | 扫描范围 |
-| `branch` | `master` | 列出 commits 的分支 |
+| `branch` | `master` | 列出 commits 的分支；该分支被改名（如 `master`→`dev_00_01_00`）时自动用新名，不存在则回退到仓库默认分支 |
+| `include-merges` | `false` | 是否在 Commits 里列出 merge commit（≥2 个 parent）；默认不列，减少 `Merge pull request` 噪音 |
 | `timezone` | `UTC` | IANA 时区，用于 `since`/`until` 墙钟 |
 | `since` | 7 天前 | `YYYY-MM-DD` 或无偏移 ISO；空则用 timezone 下 7 天前 |
 | `until` | 现在 | 同上 |
@@ -74,6 +75,11 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 ## 空窗行为
 
 时间窗内 **无 commit 且无 tag**：job **success**，log 一行 `no activity in window ...`；**不写** digest、**不发信**、**不上传** artifact；`active-count=0`。
+
+## 排障
+
+- 某仓 commits 列表失败（非空仓 409）：日志只打印 `warn: commit listing failed for N/M repos`（不含仓名，公开日志安全）；`verbose: true` 时才打印仓名与错误。
+- **全部**仓 commits 列表失败：job 失败，不会发只有 Tags 的邮件。
 
 ## 时区与 since/until
 
@@ -110,6 +116,7 @@ export INPUT_TIMEZONE=Asia/Shanghai
 export INPUT_VERBOSE=true
 ./digest.sh
 cat digest.md .digest-meta.json
+python3 -m unittest discover -s tests -v
 ```
 
 ## 发布

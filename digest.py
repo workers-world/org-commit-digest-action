@@ -70,13 +70,29 @@ def gh_graphql(query: str, **variables: str | None) -> dict[str, object]:
     return data
 
 
-def gh_json(path: str, *, paginate: bool = False, params: dict[str, str] | None = None) -> object:
-    args = ["api", path, "--jq", "."]
+def build_gh_json_args(
+    path: str,
+    *,
+    paginate: bool = False,
+    params: dict[str, str] | None = None,
+) -> list[str]:
+    """Build `gh api` args for a REST GET.
+
+    `gh api` silently switches to POST as soon as any -f/-F field is passed, so
+    query params MUST be paired with an explicit `--method GET`; otherwise
+    list endpoints such as /repos/{o}/{r}/commits return 404.
+    """
+    args = ["api", "--method", "GET", path, "--jq", "."]
     if paginate:
-        args.insert(2, "--paginate")
+        args.insert(1, "--paginate")
     if params:
         for key, value in params.items():
             args.extend(["-f", f"{key}={value}"])
+    return args
+
+
+def gh_json(path: str, *, paginate: bool = False, params: dict[str, str] | None = None) -> object:
+    args = build_gh_json_args(path, paginate=paginate, params=params)
     raw = run_gh(args)
     if not raw.strip():
         return []
@@ -181,13 +197,25 @@ def repo_owner_name(org: str, repo_entry: str) -> tuple[str, str]:
 def resolve_branch(owner: str, name: str, branch: str) -> str:
     requested = branch.strip() or "master"
     try:
-        run_gh(["api", f"repos/{owner}/{name}/branches/{requested}", "--jq", ".name"])
-        return requested
+        # GitHub follows renamed branches here (e.g. master -> dev_00_01_00) and
+        # returns the *current* name; use it, since /commits?sha=<old name> 404s.
+        actual = parse_gh_jq_scalar(
+            run_gh(["api", f"repos/{owner}/{name}/branches/{requested}", "--jq", ".name"])
+        )
+        return actual or requested
     except RuntimeError:
         default = parse_gh_jq_scalar(
             run_gh(["api", f"repos/{owner}/{name}", "--jq", ".default_branch"])
         )
         return default
+
+
+class CommitListError(RuntimeError):
+    """Listing commits failed for a reason other than an empty repository."""
+
+
+def is_empty_repo_error(message: str) -> bool:
+    return "Git Repository is empty" in message or "HTTP 409" in message
 
 
 def list_commits(
@@ -196,17 +224,31 @@ def list_commits(
     branch: str,
     since: datetime,
     until: datetime,
+    tz: ZoneInfo | timezone = timezone.utc,
+    include_merges: bool = False,
 ) -> list[dict[str, str]]:
     since_iso = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+    until_iso = until.strftime("%Y-%m-%dT%H:%M:%SZ")
     try:
         commits = gh_json(
             f"repos/{owner}/{name}/commits",
             paginate=True,
-            params={"sha": branch, "since": since_iso, "per_page": "100"},
+            params={"sha": branch, "since": since_iso, "until": until_iso, "per_page": "100"},
         )
-    except RuntimeError:
-        return []
+    except RuntimeError as exc:
+        if is_empty_repo_error(str(exc)):
+            return []
+        raise CommitListError(str(exc)) from exc
+    return parse_commit_rows(commits, until, tz, include_merges=include_merges)
 
+
+def parse_commit_rows(
+    commits: object,
+    until: datetime,
+    tz: ZoneInfo | timezone = timezone.utc,
+    *,
+    include_merges: bool = False,
+) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     if not isinstance(commits, list):
         return rows
@@ -215,6 +257,9 @@ def list_commits(
             continue
         commit = item.get("commit")
         if not isinstance(commit, dict):
+            continue
+        parents = item.get("parents")
+        if not include_merges and isinstance(parents, list) and len(parents) > 1:
             continue
         date_raw = (
             (commit.get("committer") or {}).get("date")
@@ -227,14 +272,14 @@ def list_commits(
         if committed > until:
             continue
         sha = str(item.get("sha") or "")[:7]
-        message = str((commit.get("message") or "").splitlines()[0])
+        message = str(((commit.get("message") or "").splitlines() or [""])[0])
         author = str(((commit.get("author") or {}).get("name") or "unknown"))
         rows.append(
             {
                 "sha": sha,
                 "message": message,
                 "author": author,
-                "date": committed.astimezone(timezone.utc).strftime("%Y-%m-%d"),
+                "date": committed.astimezone(tz).strftime("%Y-%m-%d"),
             }
         )
     return rows
@@ -245,9 +290,10 @@ def list_tags(
     name: str,
     since: datetime,
     until: datetime,
+    tz: ZoneInfo | timezone = timezone.utc,
 ) -> list[dict[str, str]]:
     try:
-        return _list_tags_graphql(owner, name, since, until)
+        return _list_tags_graphql(owner, name, since, until, tz)
     except RuntimeError:
         return []
 
@@ -257,6 +303,7 @@ def _list_tags_graphql(
     name: str,
     since: datetime,
     until: datetime,
+    tz: ZoneInfo | timezone = timezone.utc,
 ) -> list[dict[str, str]]:
     query = """
     query($owner: String!, $name: String!, $cursor: String) {
@@ -325,7 +372,7 @@ def _list_tags_graphql(
                     {
                         "name": tag_name,
                         "sha": sha or "???????",
-                        "date": committed.astimezone(timezone.utc).strftime("%Y-%m-%d"),
+                        "date": committed.astimezone(tz).strftime("%Y-%m-%d"),
                     }
                 )
 
@@ -391,13 +438,16 @@ def main() -> int:
     exclude_csv = os.environ.get("INPUT_EXCLUDE", "")
     out_file = os.environ.get("INPUT_OUT", "digest.md") or "digest.md"
     verbose = os.environ.get("INPUT_VERBOSE", "false").lower() == "true"
+    include_merges = os.environ.get("INPUT_INCLUDE_MERGES", "false").lower() == "true"
 
     since, until, since_label, until_label = resolve_window(since_raw, until_raw, tz_name)
     scope, repo_names = resolve_repos(org, repo)
     excludes = load_excludes(exclude_file, exclude_csv)
 
+    tz = ZoneInfo(tz_name)
     scanned = 0
     active = 0
+    commit_failures = 0
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]] = []
 
     for entry in repo_names:
@@ -407,13 +457,25 @@ def main() -> int:
             continue
         scanned += 1
         use_branch = resolve_branch(owner, name, branch)
-        commits = list_commits(owner, name, use_branch, since, until)
-        tags = list_tags(owner, name, since, until)
+        try:
+            commits = list_commits(owner, name, use_branch, since, until, tz, include_merges)
+        except CommitListError as exc:
+            commit_failures += 1
+            commits = []
+            if verbose:
+                eprint(f"warn: listing commits failed for {short_name}: {exc}")
+        tags = list_tags(owner, name, since, until, tz)
         if commits or tags:
             active += 1
             sections.append((short_name, commits, tags))
             if verbose:
                 eprint(f"active {short_name}: {len(commits)} commits, {len(tags)} tags")
+
+    if commit_failures:
+        # Count only: repo names may be private and this log can be public.
+        eprint(f"warn: commit listing failed for {commit_failures}/{scanned} repos")
+        if commit_failures == scanned:
+            raise SystemExit("commit listing failed for every scanned repo; refusing to send a tag-only digest")
 
     meta_path = Path(META_FILE)
     if active == 0:
@@ -459,6 +521,6 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except SystemExit as exc:
-        if str(exc):
-            eprint(str(exc))
+        if isinstance(exc.code, str) and exc.code:
+            eprint(exc.code)
         raise
