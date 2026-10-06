@@ -134,12 +134,37 @@ runs:
         path: ${{ github.action_path }}/${{ inputs.out }}
         if-no-files-found: error
 
+    - id: load-html
+      if: inputs.notify == 'true' && steps.meta.outputs.active-count != '0'
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+
+        meta = json.loads(Path(".digest-meta.json").read_text(encoding="utf-8"))
+        html_path = meta.get("digest-html-file", "")
+        if not html_path or not Path(html_path).is_file():
+            raise SystemExit("digest html missing")
+        html_text = Path(html_path).read_text(encoding="utf-8")
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+            handle.write("html<<EOF\n")
+            handle.write(html_text)
+            if not html_text.endswith("\n"):
+                handle.write("\n")
+            handle.write("EOF\n")
+        PY
+
     - name: Send digest email
       if: inputs.notify == 'true' && steps.meta.outputs.active-count != '0'
       uses: workers-world/action-notify-email@v1
       with:
         subject: ${{ steps.meta.outputs.subject }}
         body-file: ${{ github.action_path }}/${{ inputs.out }}
+        html: ${{ steps.load-html.outputs.html }}
         to: ${{ inputs.notify-to }}
         dedup-key: org-commit-digest-${{ steps.meta.outputs.scope }}-${{ steps.meta.outputs.subject }}-${{ github.run_id }}
         fail-on-error: ${{ inputs.fail-on-notify-error }}
