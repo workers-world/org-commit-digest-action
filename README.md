@@ -78,7 +78,7 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 
 1. **Summary（邮件顶部）**：时间窗（`since .. until` + `timezone`）、有活动的 repo 数、总 commit/tag 数，以及每个 repo 的 commit/tag **数量表**（无活动的 repo 不出现）。
 2. **按 repo 明细**：`Commits` 在前、`Tags` 在后；每行短 SHA、单行 subject（过长截断）、作者、按 `timezone` 格式化的日期。
-3. **发信**：`notify: true` 时 `body-file` 使用 Markdown 文件作纯文本 fallback，`html` 传入同次扫描生成的 HTML 文件内容；`verbose: false` 时日志仍只打印 `digest written: ...`，不会把正文写入 Actions log。
+3. **发信**：`notify: true` 时 `body-file` 使用 Markdown 文件作纯文本 fallback，`html-file` 指向同次扫描生成的 HTML 文件（路径见 meta 的 `digest-html-file`，默认与 `out` 同主名、`.html` 后缀）；大 HTML 不经 `GITHUB_OUTPUT` 内联，避免 `Argument list too long` 与日志泄露正文。`verbose: false` 时日志仍只打印 `digest written: ...`。
 
 后续 phase 可能增加可配置的 CI/依赖 bump 过滤；当前版本不做 subject 过滤。
 
