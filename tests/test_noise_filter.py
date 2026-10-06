@@ -174,7 +174,7 @@ class FilterDigestRowsTests(unittest.TestCase):
         def fetch(_o: str, _n: str, _s: str) -> list[str]:
             return []
 
-        filtered, counts = filter_digest_rows(
+        filtered, counts, per_repo = filter_digest_rows(
             "workers-world",
             sections,
             fetch_files=fetch,
@@ -183,6 +183,8 @@ class FilterDigestRowsTests(unittest.TestCase):
         self.assertEqual(len(filtered), 1)
         self.assertEqual(filtered[0][0], "real-repo")
         self.assertEqual(counts["R3 sdk_dep_bump"], 1)
+        self.assertEqual(per_repo["por1"], (1, 0, 0, 0))
+        self.assertEqual(per_repo["real-repo"], (1, 0, 1, 0))
 
 
 class GoldFixtureSamplesTests(unittest.TestCase):

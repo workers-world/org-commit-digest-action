@@ -77,7 +77,7 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 
 有活动时生成的 digest 结构：
 
-1. **Summary（邮件顶部）**：时间窗（`since .. until` + `timezone`）、有活动的 repo 数、总 commit/tag 数，以及每个 repo 的 commit/tag **数量表**（无活动的 repo 不出现）。Summary 表与下方明细均按 **commit 数降序** 排列，相同 commit 数时按 tag 数降序，再按 repo 名。
+1. **Summary（邮件顶部）**：时间窗（`since .. until` + `timezone`）、有活动的 repo 数、总 commit/tag 数；`noise-filter: true` 时另有一行 **Noise**（全 org 被过滤掉的 commit+tag 占比）。Summary 表列为 `Repo | Commits | Tags | Noise`：Commits/Tags 为过滤后保留数（与正文一致），Noise 为该仓 `dropped/raw`（一位小数，如 `72.4%`）。仅被噪声占满的 repo 仍出现在 Summary（Commits/Tags 为 0、Noise 为 100%），但正文无对应章节。关闭噪声过滤时 Noise 列均为 `0.0%`，且不显示 org 级 Noise。Summary 表与下方明细均按 **commit 数降序** 排列，相同 commit 数时按 tag 数降序，再按 repo 名。
 2. **按 repo 明细**：`Commits` 在前、`Tags` 在后；每行短 SHA、单行 subject（过长截断）、作者、按 `timezone` 格式化的日期。
 3. **发信**：`notify: true` 时 `body-file` 使用 Markdown 文件作纯文本 fallback，`html-file` 指向同次扫描生成的 HTML 文件（路径见 meta 的 `digest-html-file`，默认与 `out` 同主名、`.html` 后缀）；**另附** `commit-digest.csv`（路径见 `digest-csv-file`，默认与 `out` 同主名、`.csv` 后缀），列含窗口、repo、type（commit|tag）、sha、name/subject、author、date，便于在表格中筛选。大 HTML/CSV 不经 `GITHUB_OUTPUT` 内联，避免 `Argument list too long` 与日志泄露正文。`verbose: false` 时日志仍只打印 `digest written: ...`。
 

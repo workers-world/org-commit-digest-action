@@ -187,14 +187,22 @@ def classify_item(
     return None
 
 
+RepoActivityCounts = tuple[int, int, int, int]
+# raw_commits, raw_tags, kept_commits, kept_tags (per repo in the filter window)
+
+
 def filter_digest_rows(
     org: str,
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
     *,
     fetch_files: FilesFn,
     repo_owner_name: Callable[[str, str], tuple[str, str]],
-) -> tuple[list[tuple[str, list[dict[str, str]], list[dict[str, str]]]], Counter[str]]:
-    """Return filtered sections and ignore_reason counts."""
+) -> tuple[
+    list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    Counter[str],
+    dict[str, RepoActivityCounts],
+]:
+    """Return filtered sections, ignore_reason counts, and per-repo raw/kept totals."""
     window_items: list[tuple[str, str, str, WindowItem]] = []
     for short_name, commits, tags in sections:
         owner, name = repo_owner_name(org, short_name)
@@ -249,11 +257,13 @@ def filter_digest_rows(
             ignored[reason] += 1
             drop_keys.add((short_name, item.item_type, item.sha if item.item_type == "commit" else item.name))
 
+    per_repo: dict[str, RepoActivityCounts] = {}
     filtered: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]] = []
     for short_name, commits, tags in sections:
         keep_commits = [r for r in commits if (short_name, "commit", r["sha"]) not in drop_keys]
         keep_tags = [r for r in tags if (short_name, "tag", r["name"]) not in drop_keys]
+        per_repo[short_name] = (len(commits), len(tags), len(keep_commits), len(keep_tags))
         if keep_commits or keep_tags:
             filtered.append((short_name, keep_commits, keep_tags))
 
-    return filtered, ignored
+    return filtered, ignored, per_repo
