@@ -4,7 +4,10 @@ from digest import (
     build_digest,
     build_digest_csv,
     build_digest_html,
+    build_summary_rows,
     build_summary_text,
+    format_noise_ratio,
+    org_wide_noise_ratio,
     sort_sections,
     truncate_subject,
 )
@@ -57,8 +60,8 @@ class BuildDigestTests(unittest.TestCase):
         alpha_pos = text.index("## alpha")
         self.assertLess(summary_pos, alpha_pos)
         self.assertIn("Window: **2026-09-29 .. 2026-10-06** (Asia/Shanghai)", text)
-        self.assertIn("| alpha | 2 | 1 |", text)
-        self.assertIn("| beta | 1 | 0 |", text)
+        self.assertIn("| alpha | 2 | 1 | 0.0% |", text)
+        self.assertIn("| beta | 1 | 0 | 0.0% |", text)
         self.assertNotIn("## quiet", text)
 
     def test_summary_table_sorted_by_commit_count_desc(self) -> None:
@@ -75,9 +78,9 @@ class BuildDigestTests(unittest.TestCase):
             ("beta", [], [{"name": "v1", "sha": "abc", "date": "2026-10-04"}]),
         ]
         text = build_digest("org:o", "2026-09-29", "2026-10-06", "UTC", sections)
-        alpha_row = text.index("| alpha | 2 | 0 |")
-        zeta_row = text.index("| zeta | 1 | 0 |")
-        beta_row = text.index("| beta | 0 | 1 |")
+        alpha_row = text.index("| alpha | 2 | 0 | 0.0% |")
+        zeta_row = text.index("| zeta | 1 | 0 | 0.0% |")
+        beta_row = text.index("| beta | 0 | 1 | 0.0% |")
         self.assertLess(alpha_row, zeta_row)
         self.assertLess(zeta_row, beta_row)
 
@@ -93,9 +96,48 @@ class BuildDigestTests(unittest.TestCase):
             "2026-09-29",
             "2026-10-06",
             "UTC",
-            [("alpha", 2, 1), ("beta", 1, 0)],
+            [("alpha", 2, 1, "0.0%"), ("beta", 1, 0, "0.0%")],
         )
         self.assertIn("Repos with activity: **2** · Commits: **3** · Tags: **1**", summary)
+        self.assertNotIn("Noise:", summary)
+
+    def test_format_noise_ratio(self) -> None:
+        self.assertEqual(format_noise_ratio(raw=0, kept=0), "0.0%")
+        self.assertEqual(format_noise_ratio(raw=4, kept=1), "75.0%")
+        self.assertEqual(format_noise_ratio(raw=3, kept=3), "0.0%")
+
+    def test_summary_with_per_repo_noise_includes_noise_only_repo(self) -> None:
+        per_repo = {
+            "real": (2, 0, 1, 0),
+            "noise-only": (3, 1, 0, 0),
+        }
+        rows = build_summary_rows([], per_repo_counts=per_repo)
+        self.assertEqual(len(rows), 2)
+        by_name = {name: (c, t, noise) for name, c, t, noise in rows}
+        self.assertEqual(by_name["real"], (1, 0, "50.0%"))
+        self.assertEqual(by_name["noise-only"], (0, 0, "100.0%"))
+        self.assertEqual(org_wide_noise_ratio(per_repo), "83.3%")
+
+    def test_build_digest_shows_org_noise_when_filter_stats_present(self) -> None:
+        sections = [
+            (
+                "real",
+                [{"sha": "abc1234", "message": "feat", "author": "a", "date": "2026-10-06"}],
+                [],
+            )
+        ]
+        per_repo = {"real": (2, 0, 1, 0), "noise-only": (1, 0, 0, 0)}
+        text = build_digest(
+            "org:o",
+            "2026-09-29",
+            "2026-10-06",
+            "UTC",
+            sections,
+            per_repo_counts=per_repo,
+        )
+        self.assertIn("Noise: **66.7%**", text)
+        self.assertIn("| noise-only | 0 | 0 | 100.0% |", text)
+        self.assertNotIn("## noise-only", text)
 
 
 class BuildDigestCsvTests(unittest.TestCase):
@@ -114,6 +156,7 @@ class BuildDigestHtmlTests(unittest.TestCase):
         self.assertIn("<strong>Window:</strong>", html)
         self.assertIn("2026-09-29 .. 2026-10-06 (Asia/Shanghai)", html)
         self.assertIn("<td>alpha</td>", html)
+        self.assertIn("<th align=\"right\">Noise</th>", html)
         self.assertIn("Commits (2)", html)
         self.assertIn("<code>abc1234</code>", html)
         self.assertLess(html.index("Commits (2)"), html.index("Tags (1)"))

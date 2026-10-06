@@ -427,31 +427,91 @@ def digest_title(scope: str, since_label: str, until_label: str, tz_name: str) -
     return f"Commit digest: {scope} ({since_label} .. {until_label} {tz_name})"
 
 
+def format_noise_ratio(*, raw: int, kept: int) -> str:
+    if raw <= 0:
+        return "0.0%"
+    dropped = raw - kept
+    return f"{100.0 * dropped / raw:.1f}%"
+
+
+def repo_raw_total(counts: tuple[int, int, int, int]) -> int:
+    return counts[0] + counts[1]
+
+
+def repo_kept_total(counts: tuple[int, int, int, int]) -> int:
+    return counts[2] + counts[3]
+
+
 def build_summary_rows(
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
-) -> list[tuple[str, int, int]]:
-    return [(name, len(commits), len(tags)) for name, commits, tags in sort_sections(sections)]
+    *,
+    per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None,
+) -> list[tuple[str, int, int, str]]:
+    """Summary table rows: repo name, kept commits/tags, noise ratio string."""
+    if per_repo_counts is None:
+        rows = [
+            (name, len(commits), len(tags), "0.0%")
+            for name, commits, tags in sort_sections(sections)
+        ]
+        return rows
+
+    summary: list[tuple[str, int, int, str]] = []
+    for repo_name, raw_c, raw_t, kept_c, kept_t in (
+        (name, *counts) for name, counts in per_repo_counts.items()
+    ):
+        raw = raw_c + raw_t
+        if raw <= 0:
+            continue
+        kept = kept_c + kept_t
+        summary.append(
+            (
+                repo_name,
+                kept_c,
+                kept_t,
+                format_noise_ratio(raw=raw, kept=kept),
+            )
+        )
+    return sorted(
+        summary,
+        key=lambda item: (-item[1], -item[2], item[0].casefold()),
+    )
+
+
+def org_wide_noise_ratio(
+    per_repo_counts: dict[str, tuple[int, int, int, int]],
+) -> str:
+    raw = sum(repo_raw_total(c) for c in per_repo_counts.values())
+    kept = sum(repo_kept_total(c) for c in per_repo_counts.values())
+    return format_noise_ratio(raw=raw, kept=kept)
 
 
 def build_summary_text(
     since_label: str,
     until_label: str,
     tz_name: str,
-    summary_rows: list[tuple[str, int, int]],
+    summary_rows: list[tuple[str, int, int, str]],
+    *,
+    org_noise_ratio: str | None = None,
 ) -> str:
-    total_commits = sum(c for _, c, _ in summary_rows)
-    total_tags = sum(t for _, _, t in summary_rows)
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
+    activity_line = (
+        f"Repos with activity: **{len(summary_rows)}** · "
+        f"Commits: **{total_commits}** · Tags: **{total_tags}**"
+    )
+    if org_noise_ratio is not None:
+        activity_line += f" · Noise: **{org_noise_ratio}**"
     lines = [
         "## Summary",
         "",
         f"Window: **{since_label} .. {until_label}** ({tz_name})",
-        f"Repos with activity: **{len(summary_rows)}** · Commits: **{total_commits}** · Tags: **{total_tags}**",
+        activity_line,
         "",
-        "| Repo | Commits | Tags |",
-        "| --- | ---: | ---: |",
+        "| Repo | Commits | Tags | Noise |",
+        "| --- | ---: | ---: | ---: |",
     ]
-    for repo_name, commit_count, tag_count in summary_rows:
-        lines.append(f"| {repo_name} | {commit_count} | {tag_count} |")
+    for repo_name, commit_count, tag_count, noise in summary_rows:
+        lines.append(f"| {repo_name} | {commit_count} | {tag_count} | {noise} |")
     lines.extend(["", "---", ""])
     return "\n".join(lines)
 
@@ -482,12 +542,21 @@ def build_digest(
     until_label: str,
     tz_name: str,
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    *,
+    per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None,
 ) -> str:
-    summary_rows = build_summary_rows(sections)
+    summary_rows = build_summary_rows(sections, per_repo_counts=per_repo_counts)
+    org_noise = org_wide_noise_ratio(per_repo_counts) if per_repo_counts else None
     parts = [
         f"# {digest_title(scope, since_label, until_label, tz_name)}",
         "",
-        build_summary_text(since_label, until_label, tz_name, summary_rows).rstrip(),
+        build_summary_text(
+            since_label,
+            until_label,
+            tz_name,
+            summary_rows,
+            org_noise_ratio=org_noise,
+        ).rstrip(),
         build_repo_sections_text(sections).rstrip(),
     ]
     return "\n".join(parts).rstrip() + "\n"
@@ -499,25 +568,37 @@ def build_digest_html(
     until_label: str,
     tz_name: str,
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    *,
+    per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None,
 ) -> str:
-    summary_rows = build_summary_rows(sections)
-    total_commits = sum(c for _, c, _ in summary_rows)
-    total_tags = sum(t for _, _, t in summary_rows)
+    summary_rows = build_summary_rows(sections, per_repo_counts=per_repo_counts)
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
     title = html.escape(digest_title(scope, since_label, until_label, tz_name))
     window = html.escape(f"{since_label} .. {until_label} ({tz_name})")
 
     summary_table = [
         "<table>",
-        "<thead><tr><th align=\"left\">Repo</th><th align=\"right\">Commits</th><th align=\"right\">Tags</th></tr></thead>",
+        "<thead><tr><th align=\"left\">Repo</th><th align=\"right\">Commits</th>"
+        "<th align=\"right\">Tags</th><th align=\"right\">Noise</th></tr></thead>",
         "<tbody>",
     ]
-    for repo_name, commit_count, tag_count in summary_rows:
+    for repo_name, commit_count, tag_count, noise in summary_rows:
         summary_table.append(
             f"<tr><td>{html.escape(repo_name)}</td>"
             f"<td align=\"right\">{commit_count}</td>"
-            f"<td align=\"right\">{tag_count}</td></tr>"
+            f"<td align=\"right\">{tag_count}</td>"
+            f"<td align=\"right\">{html.escape(noise)}</td></tr>"
         )
     summary_table.extend(["</tbody>", "</table>"])
+
+    activity_bits = (
+        f"<strong>Repos with activity:</strong> {len(summary_rows)} · "
+        f"<strong>Commits:</strong> {total_commits} · <strong>Tags:</strong> {total_tags}"
+    )
+    if per_repo_counts is not None:
+        org_noise = html.escape(org_wide_noise_ratio(per_repo_counts))
+        activity_bits += f" · <strong>Noise:</strong> {org_noise}"
 
     body_parts = [
         "<!DOCTYPE html>",
@@ -526,8 +607,7 @@ def build_digest_html(
         "<body style=\"font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.45; color: #1f2328;\">",
         f"<h1 style=\"font-size: 1.25rem;\">{title}</h1>",
         f"<p><strong>Window:</strong> {window}<br>",
-        f"<strong>Repos with activity:</strong> {len(summary_rows)} · "
-        f"<strong>Commits:</strong> {total_commits} · <strong>Tags:</strong> {total_tags}</p>",
+        f"{activity_bits}</p>",
         "\n".join(summary_table),
         "<hr>",
     ]
@@ -715,19 +795,21 @@ def main() -> int:
         if commit_failures == scanned:
             raise SystemExit("commit listing failed for every scanned repo; refusing to send a tag-only digest")
 
+    had_raw_activity = bool(sections)
+    per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None
     if noise_filter_enabled and sections:
         files_cache = CommitFilesCache()
-        sections, ignored_counts = noise_filter.filter_digest_rows(
+        sections, ignored_counts, per_repo_counts = noise_filter.filter_digest_rows(
             org,
             sections,
             fetch_files=files_cache.get,
             repo_owner_name=repo_owner_name,
         )
         log_noise_filter_stats(ignored_counts, verbose=verbose)
-        active = len(sections)
+        active = sum(1 for counts in per_repo_counts.values() if repo_kept_total(counts) > 0)
 
     meta_path = Path(META_FILE)
-    if active == 0:
+    if not had_raw_activity:
         message = f"no activity in window {since_label}..{until_label} {tz_name} ({scanned} repos scanned)"
         print(message)
         write_meta(
@@ -745,10 +827,24 @@ def main() -> int:
         )
         return 0
 
-    digest_text = build_digest(scope, since_label, until_label, tz_name, sections)
+    digest_text = build_digest(
+        scope,
+        since_label,
+        until_label,
+        tz_name,
+        sections,
+        per_repo_counts=per_repo_counts,
+    )
     html_file = html_path_for_digest(out_file)
     csv_file = csv_path_for_digest(out_file)
-    digest_html = build_digest_html(scope, since_label, until_label, tz_name, sections)
+    digest_html = build_digest_html(
+        scope,
+        since_label,
+        until_label,
+        tz_name,
+        sections,
+        per_repo_counts=per_repo_counts,
+    )
     digest_csv = build_digest_csv(since_label, until_label, tz_name, sections)
     Path(out_file).write_text(digest_text, encoding="utf-8")
     html_file.write_text(digest_html, encoding="utf-8")
