@@ -38,6 +38,23 @@ def run_gh(args: list[str]) -> str:
     return proc.stdout
 
 
+def parse_repo_list_json(raw: str) -> list[str]:
+    """Parse `gh repo list --json name` output (a JSON array of objects)."""
+    payload = json.loads(raw or "[]")
+    if not isinstance(payload, list):
+        raise RuntimeError(f"unexpected repo list response: {raw[:200]!r}")
+    names: list[str] = []
+    for item in payload:
+        if isinstance(item, dict) and item.get("name"):
+            names.append(str(item["name"]))
+    return names
+
+
+def parse_gh_jq_scalar(raw: str) -> str:
+    """Parse scalar output from `gh ... --jq .field` (plain text, not JSON)."""
+    return raw.strip()
+
+
 def gh_graphql(query: str, **variables: str | None) -> dict[str, object]:
     args = ["api", "graphql", "-f", f"query={query}"]
     for key, value in variables.items():
@@ -145,7 +162,12 @@ def resolve_repos(org: str, repo: str) -> tuple[str, list[str]]:
         return f"repo:{org}/{repo}", [repo]
     if not org:
         raise SystemExit("org or repo is required")
-    names = json.loads(run_gh(["repo", "list", org, "--json", "name", "--limit", "500", "--jq", ".[].name"]))
+    raw = run_gh(["repo", "list", org, "--json", "name", "--limit", "500"])
+    names = parse_repo_list_json(raw)
+    if not names:
+        raise SystemExit(
+            f"no repositories found for org {org!r} (verify org name and that GH_TOKEN can list org repos)"
+        )
     return f"org:{org}", names
 
 
@@ -162,8 +184,10 @@ def resolve_branch(owner: str, name: str, branch: str) -> str:
         run_gh(["api", f"repos/{owner}/{name}/branches/{requested}", "--jq", ".name"])
         return requested
     except RuntimeError:
-        default = json.loads(run_gh(["api", f"repos/{owner}/{name}", "--jq", ".default_branch"]))
-        return str(default)
+        default = parse_gh_jq_scalar(
+            run_gh(["api", f"repos/{owner}/{name}", "--jq", ".default_branch"])
+        )
+        return default
 
 
 def list_commits(
