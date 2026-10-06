@@ -124,6 +124,7 @@ runs:
         for key in (
             "digest-file",
             "digest-html-file",
+            "digest-csv-file",
             "subject",
             "repo-count",
             "active-count",
@@ -148,6 +149,9 @@ runs:
         subject: ${{ steps.meta.outputs.subject }}
         body-file: ${{ github.action_path }}/${{ inputs.out }}
         html-file: ${{ github.action_path }}/${{ steps.meta.outputs.digest-html-file }}
+        attachment-file: ${{ github.action_path }}/${{ steps.meta.outputs.digest-csv-file }}
+        attachment-filename: commit-digest.csv
+        attachment-content-type: text/csv
         to: ${{ inputs.notify-to }}
         dedup-key: org-commit-digest-${{ steps.meta.outputs.scope }}-${{ steps.meta.outputs.subject }}-${{ github.run_id }}
         fail-on-error: ${{ inputs.fail-on-notify-error }}
