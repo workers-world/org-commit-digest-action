@@ -24,3 +24,4 @@ jobs:
           grep -q 'name: Org commit digest' action.yml
           grep -q 'workers-world/action-notify-email@v1' action.yml
           python3 -m py_compile digest.py
+          python3 -m unittest discover -s tests -v
