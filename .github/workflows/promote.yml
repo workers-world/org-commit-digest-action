@@ -15,13 +15,62 @@ on:
         type: string
 
 jobs:
-  promote:
+  promote-preflight:
     permissions: {}
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        startsWith(github.event.workflow_run.head_branch, 'dev_'))
+    runs-on: ubuntu-latest
+    outputs:
+      noop: ${{ steps.check.outputs.noop }}
+    env:
+      RELEASE_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.release_branch || github.event.workflow_run.head_branch }}
+      MASTER_BRANCH: master
+    steps:
+      - name: Check commits to promote
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GHA_TOKEN || secrets.WORKERS_WORLD_GHA_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::缺少 GHA_TOKEN / WORKERS_WORLD_GHA_TOKEN，无法检查 promote 是否有待合入提交。"
+            exit 1
+          fi
+          if ! [[ "$RELEASE_BRANCH" =~ ^dev_ ]]; then
+            echo "::error::release_branch 须匹配 dev_*（当前: ${RELEASE_BRANCH}）"
+            exit 1
+          fi
+          REPO="${{ github.repository }}"
+          if ! gh api "repos/${REPO}/branches/${RELEASE_BRANCH}" --jq .name >/dev/null 2>&1; then
+            echo "::error::分支 ${RELEASE_BRANCH} 不存在于 ${REPO}"
+            exit 1
+          fi
+          ahead_by="$(gh api "repos/${REPO}/compare/${MASTER_BRANCH}...${RELEASE_BRANCH}" --jq '.ahead_by')"
+          if [ "${ahead_by}" = "0" ]; then
+            echo "Promote noop: ${RELEASE_BRANCH} 相对 ${MASTER_BRANCH} 无 ahead 提交（已 promote 或无可发布内容）。"
+            echo "noop=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Promote: ${RELEASE_BRANCH} is ${ahead_by} commit(s) ahead of ${MASTER_BRANCH}."
+          echo "noop=false" >> "$GITHUB_OUTPUT"
+
+  promote-noop:
+    permissions: {}
+    needs: promote-preflight
+    if: needs.promote-preflight.outputs.noop == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip promote (nothing to release)
+        run: |
+          echo "Promote finished as noop: no Release PR created or merged."
+
+  promote:
+    permissions: {}
+    needs: promote-preflight
+    if: needs.promote-preflight.outputs.noop != 'true'
     uses: workers-world/worker-actions/.github/workflows/worker-promote.yml@actions/v0.2.3
     with:
       release_branch: ${{ github.event_name == 'workflow_dispatch' && inputs.release_branch || github.event.workflow_run.head_branch }}
