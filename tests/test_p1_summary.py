@@ -13,11 +13,14 @@ from digest import (
     build_kpi_snapshot,
     build_layered_summary_md,
     build_sparkline_series,
+    build_trend_datasets,
     count_kept_rows_from_csv,
     find_prior_week_kpi,
+    format_wow_suffix_html,
     format_wow_suffix,
     kpi_from_meta_record,
     load_kpi_history,
+    render_trend_chart_svg,
     select_prior_week_kpi,
     sparkline_ascii,
     sparkline_svg_data_uri,
@@ -221,8 +224,32 @@ class LayeredSummaryP1Tests(unittest.TestCase):
                 current_kpi={"active-repos": 1, "kept-commits": 1, "tags": 0},
             ),
         )
-        self.assertNotIn("<th align=\"right\">Noise</th>", html)
+        self.assertNotIn(">Noise</th>", html)
         self.assertIn("Commit types (kept)", html)
+        self.assertIn("<table ", html)
+        self.assertIn(">Type</th>", html)
+
+    def test_html_trend_chart_has_date_axis(self) -> None:
+        history = [
+            {"_until": "2026-09-21", "kept-commits": 40, "active-repos": 5},
+            {"_until": "2026-09-28", "kept-commits": 55, "active-repos": 6},
+        ]
+        current = {"kept-commits": 29, "active-repos": 10}
+        dates, commits, repos = build_trend_datasets(
+            history, current, current_until="2026-10-06"
+        )
+        chart = render_trend_chart_svg(dates, commits, repos)
+        self.assertIn("<svg", chart)
+        self.assertIn("9/28", chart)
+        self.assertIn("10/6", chart)
+        self.assertIn("Commits", chart)
+        self.assertIn("Active repos", chart)
+
+    def test_wow_suffix_html_colors(self) -> None:
+        up = format_wow_suffix_html(12.0)
+        down = format_wow_suffix_html(-5.0)
+        self.assertIn("#1a7f37", up)
+        self.assertIn("#cf222e", down)
 
     def test_full_digest_md_still_has_noise_in_full_detail(self) -> None:
         sections = self._sections()
