@@ -52,8 +52,8 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 | `include-merges` | `false` | 是否在 Commits 里列出 merge commit（≥2 个 parent）；默认不列，减少 `Merge pull request` 噪音 |
 | `noise-filter` | `true` | 过滤可忽略的自动化噪声（action pin、SDK/lockfile bot、空 release 推广等）；`false` 时输出完整列表 |
 | `timezone` | `UTC` | IANA 时区，用于 `since`/`until` 墙钟 |
-| `since` | 7 天前 | `YYYY-MM-DD` 或无偏移 ISO；空则用 timezone 下 7 天前 |
-| `until` | 现在 | 同上 |
+| `since` | 见下 | `YYYY-MM-DD` 或无偏移 ISO；与 `until` 同时为空时：scheduled 跑为上一完整 Mon–Mon 周；本地/workflow_dispatch 为当周周一 |
+| `until` | 见下 | 同上；与 `since` 同时为空时：scheduled 为当周一 00:00；否则为今天 00:00。非 scheduled 时若 `until` 晚于今天则截到 today（与 Trend 轴一致） |
 | `exclude-file` | | 每行一个 repo 短名，`#` 注释 |
 | `exclude` | | 逗号分隔短名 |
 | `out` | `digest.md` | 有活动时写出 Markdown 正文；同目录生成 `.html`（如 `digest.html`）与 `.csv`（如 `digest.csv`） |
@@ -138,6 +138,7 @@ Workflow 跨 run 保留历史：checkout 或下载 artifact 到例如 `digest-hi
 - `YYYY-MM-DD` → 该时区当天 `00:00:00`
 - 无偏移 ISO → 按 `timezone` 解释
 - 带 `Z` 或 `±offset` → **以字符串偏移为准**，忽略 `timezone`
+- **默认窗**：GitHub `schedule` 触发且 `since`/`until` 皆空 → 上一完整 Mon–Mon（`until` = 运行日所在周的周一）。本地或 `workflow_dispatch` 且皆空 → 当周周一至 today。Preview 若手动设 `until` 为下一周一，非 scheduled 运行会截到 today，Summary **Window** 与 HTML **Trend** 末刻度共用同一 `until` 日期。
 
 实现使用 Python `zoneinfo`；请求 GitHub API 前转为 UTC。
 
