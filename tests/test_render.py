@@ -160,7 +160,7 @@ class BuildDigestHtmlTests(unittest.TestCase):
         self.assertIn("<strong>Window:</strong>", html)
         self.assertIn("2026-09-29 .. 2026-10-06 (Asia/Shanghai)", html)
         self.assertIn("<td>alpha</td>", html)
-        self.assertIn("<th align=\"right\">Noise</th>", html)
+        self.assertNotIn("<th align=\"right\">Noise</th>", html)
         self.assertIn("Tags / releases", html)
         self.assertIn("<code>v1.0.0</code>", html)
         self.assertIn("Notable commits", html)

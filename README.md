@@ -57,6 +57,7 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 | `exclude-file` | | 每行一个 repo 短名，`#` 注释 |
 | `exclude` | | 逗号分隔短名 |
 | `out` | `digest.md` | 有活动时写出 Markdown 正文；同目录生成 `.html`（如 `digest.html`）与 `.csv`（如 `digest.csv`） |
+| `history-dir` | `out` 所在目录 | 存放按周归档的 `{until}.digest-meta.json`（WoW KPI 与 sparkline 读历史）；见下 |
 | `verbose` | `false` | 写入 step summary（公开自跑请保持 false） |
 | `notify` | `true` | 有活动时内嵌发信 |
 | `notify-to` | | 覆盖 notify-worker `DEFAULT_TO` |
@@ -77,7 +78,7 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 
 有活动时生成的 digest 结构：
 
-1. **Summary（邮件/HTML 顶部，分层）**：一句 **TL;DR**；时间窗与 org KPI（有活动 repo 数、保留 commit/tag 数；`noise-filter: true` 时含 org **Noise%**）。**Cross-repo themes**：跨仓相同 subject 的 fan-out 折叠为一行（见下）。**Top repositories**：默认 Top 8 仓的 `Repo | Commits | Tags | Noise` 表，其余以「+N more repos」提示。**Highlights**：tag/release 与未折叠的 notable commits。**Full detail**（Markdown 内）：完整 Summary 表（含 Noise%）+ 下方按 repo 明细；HTML 邮件正文仅 Summary 层，不含逐仓 commit 列表。
+1. **Summary（邮件/HTML 顶部，分层）**：一句 **TL;DR**；时间窗与 org KPI（有活动 repo 数、保留 commit/tag 数、tags；`noise-filter: true` 时含 org **Noise%** 与规则命中摘要 R1/R4/…）。若 `history-dir` 中存在同 `scope` 的上一周 meta，KPI 行显示 **↑/↓ Δ% vs last week**；Markdown 另附 ASCII sparkline，HTML 内嵌 SVG 迷你趋势图（kept commits / active repos，最多 8 周）。**Commit types (kept)**：conventional-commit 类型计数（feat/fix/chore/ci/docs/release/other）。**Cross-repo themes**：跨仓相同 subject 的 fan-out 折叠为一行（见下）。**Top repositories**：默认 Top 8 仓的 `Repo | Commits | Tags` 表（HTML 邮件 Summary **不含**逐仓 Noise 列；Markdown Top 表仍含 Noise%），其余以「+N more repos」提示。**Highlights**：tag/release 与未折叠的 notable commits。**Full detail**（Markdown 内）：完整 Summary 表（含 Noise%）+ 下方按 repo 明细；HTML 邮件正文仅 Summary 层，不含逐仓 commit 列表。
 2. **Fan-out fold**：≥2 个 repo 出现「同一主题」commit 时，Summary 里合并为一行（主题 + repo 数 + commit 数，单作者时附作者）。匹配前先规范化 subject：去掉 conventional-commit 前缀、`WW-N` issue 键、全角括号内的仓内限定语（如 `（sch1 试点）`）、末尾 `(#PR)`，折叠空白并小写；**保留** ASCII 括号内的语义（如 `(zizmor secrets-inherit)`），避免无关 CI 主题被并在一起。逐仓完整列表仍在 **Full detail** / CSV 中。
 3. **按 repo 明细**（Markdown **Full detail** 之后）：`Commits` 在前、`Tags` 在后；每行短 SHA、单行 subject（过长截断）、作者、按 `timezone` 格式化的日期。
 4. **发信**：`notify: true` 时 `body-file` 使用 Markdown 文件作纯文本 fallback，`html-file` 指向同次扫描生成的 HTML 文件（路径见 meta 的 `digest-html-file`，默认与 `out` 同主名、`.html` 后缀）；**另附** `commit-digest.csv`（路径见 `digest-csv-file`，默认与 `out` 同主名、`.csv` 后缀），列含窗口、repo、 type（commit|tag）、sha、name/subject、author、date，**行数与过滤后明细一致**（不受 fan-out 折叠影响）。大 HTML/CSV 不经 `GITHUB_OUTPUT` 内联，避免 `Argument list too long` 与日志泄露正文。`verbose: false` 时日志仍只打印 `digest written: ...`。
@@ -105,6 +106,15 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 R4/R8/R10 会调用 GitHub **commit files** API（与 digest 相同 `GH_TOKEN`），单次 run 内缓存；文件列表不可用时 **fail-open（保留）**，避免误删业务提交。
 
 `verbose: true` 时 stderr 打印各规则忽略条数（不含 subject）；`verbose: false` 时仅一行 dropped 总数，避免公开日志泄露提交标题。
+
+### 周环比与 history-dir
+
+每次有活动时会：
+
+1. 在 action 根目录写 `.digest-meta.json`（含 `kpi`：`active-repos`、`kept-commits`、`tags`、`noise-pct`）。
+2. 在 **`history-dir`**（默认与 `out` 同目录）追加 **`{until}.digest-meta.json`**（例如 `2026-10-06.digest-meta.json`），供下次 run 读取。
+
+下次扫描时会在 `history-dir` 下 glob `*.digest-meta.json`（跳过根目录 `.digest-meta.json`），按 `window` 结束日排序，取**最近一周且 `scope` 相同**的快照与当前 KPI 做 WoW。Workflow 若需跨 run 保留历史，可在 job 开头 checkout/下载 artifact 到固定目录并设置 `history-dir: digest-history`（与 `out` 路径独立亦可）。
 
 ## 空窗行为
 
