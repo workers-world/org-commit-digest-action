@@ -214,7 +214,7 @@ class LayeredSummaryP1Tests(unittest.TestCase):
         self.assertIn("**feat** 1", md)
         self.assertIn("Trend (", md)
 
-    def test_html_top_table_omits_noise_column(self) -> None:
+    def test_html_summary_uses_charts_not_duplicate_tables(self) -> None:
         html = build_digest_html(
             "org:o",
             "2026-09-28",
@@ -229,8 +229,9 @@ class LayeredSummaryP1Tests(unittest.TestCase):
         )
         self.assertNotIn(">Noise</th>", html)
         self.assertIn("Commit types (kept)", html)
-        self.assertIn("<table ", html)
-        self.assertIn(">Type</th>", html)
+        self.assertIn("Commit types breakdown", html)
+        self.assertNotIn(">Type</th>", html)
+        self.assertNotIn(">Repo</th>", html)
 
     def test_html_trend_chart_has_date_axis(self) -> None:
         history = [
@@ -273,6 +274,7 @@ class LayeredSummaryP1Tests(unittest.TestCase):
         bar = render_top_repos_bar_chart_svg(summary_rows)
         self.assertIn("Top repositories by kept commits", bar)
         self.assertIn("alpha", bar)
+        self.assertIn("14 · 1 tag", bar)
 
         hist = Counter({"feat": 7, "fix": 8, "other": 9})
         type_chart = render_commit_type_chart_svg(hist)
@@ -293,6 +295,8 @@ class LayeredSummaryP1Tests(unittest.TestCase):
         self.assertIn("Top repositories by kept commits", html)
         self.assertIn("Commit types breakdown", html)
         self.assertNotIn("Repos with activity:", html)
+        self.assertNotIn(">Repo</th>", html)
+        self.assertNotIn(">Type</th>", html)
 
     def test_full_digest_md_still_has_noise_in_full_detail(self) -> None:
         sections = self._sections()
