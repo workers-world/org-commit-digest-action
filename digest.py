@@ -919,6 +919,8 @@ def iter_history_meta_paths(history_dir: Path) -> list[Path]:
         f"weeks/*/{META_FILE}",
         f"weeks/*/*{META_FILE}",
         f"**/{META_FILE}",
+        "weeks/*/digest-meta.json",
+        "**/digest-meta.json",
     )
     for pattern in patterns:
         for path in history_dir.glob(pattern):
