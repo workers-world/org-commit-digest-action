@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -21,6 +22,19 @@ import noise_filter
 
 META_FILE = ".digest-meta.json"
 SUBJECT_MAX_LEN = 72
+TOP_REPOS_SUMMARY_N = 8
+FANOUT_MIN_REPO_COUNT = 2
+NOTABLE_COMMITS_CAP = 12
+HIGHLIGHT_TAGS_CAP = 10
+
+# Fan-out subject matching (see README): conventional prefix, WW-N keys, (#PR) suffix.
+_CONVENTIONAL_COMMIT_PREFIX = re.compile(
+    r"^(?:fix|feat|chore|ci|docs|refactor|test|build|perf|style|revert)(?:\([^)]+\))?!?\s*:\s*",
+    re.IGNORECASE,
+)
+_ISSUE_KEY_PATTERN = re.compile(r"\bWW-\d+\b", re.IGNORECASE)
+_TRAILING_PR_REF = re.compile(r"\s*\(#\d+\)\s*$")
+_FULLWIDTH_PAREN_QUALIFIER = re.compile(r"（[^）]*）")
 
 
 def eprint(*args: object) -> None:
@@ -402,6 +416,262 @@ def truncate_subject(message: str, max_len: int = SUBJECT_MAX_LEN) -> str:
     return one_line[: max_len - 1].rstrip() + "…"
 
 
+def normalize_subject_key(message: str) -> str:
+    """Normalize commit subject for cross-repo fan-out grouping.
+
+    Heuristic: strip conventional-commit type/scope prefix, remove WW-N issue
+    keys, fullwidth parenthetical repo qualifiers (e.g. ``（sch1 试点）``), trailing
+    (#123) PR refs, collapse whitespace, lowercase, trim trailing periods. ASCII
+    parentheses (e.g. ``(zizmor secrets-inherit)``) are kept so distinct CI themes
+    do not merge. Two kept commits merge when keys match and they appear in at
+    least FANOUT_MIN_REPO_COUNT distinct repos (see group_fanout_themes).
+    """
+    text = " ".join(message.split())
+    text = _CONVENTIONAL_COMMIT_PREFIX.sub("", text)
+    text = _ISSUE_KEY_PATTERN.sub("", text)
+    text = _FULLWIDTH_PAREN_QUALIFIER.sub(" ", text)
+    text = _TRAILING_PR_REF.sub("", text)
+    text = re.sub(r"\s*\(\s*\)\s*", " ", text)
+    text = re.sub(r"\s+", " ", text).strip().lower()
+    return text.rstrip(".")
+
+
+@dataclass(frozen=True)
+class FanoutTheme:
+    display_subject: str
+    repo_count: int
+    commit_count: int
+    repos: tuple[str, ...]
+    primary_author: str | None
+
+
+def group_fanout_themes(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    *,
+    min_repo_count: int = FANOUT_MIN_REPO_COUNT,
+) -> list[FanoutTheme]:
+    buckets: dict[str, list[tuple[str, dict[str, str]]]] = {}
+    for repo_name, commits, _tags in sections:
+        for commit in commits:
+            key = normalize_subject_key(commit["message"])
+            if not key:
+                continue
+            buckets.setdefault(key, []).append((repo_name, commit))
+
+    themes: list[FanoutTheme] = []
+    for _key, entries in buckets.items():
+        repos = sorted({repo for repo, _ in entries}, key=str.casefold)
+        if len(repos) < min_repo_count:
+            continue
+        messages = [commit["message"] for _, commit in entries]
+        display = max(messages, key=lambda msg: (messages.count(msg), len(msg)))
+        authors = Counter(commit["author"] for _, commit in entries)
+        primary_author: str | None = None
+        if len(authors) == 1:
+            primary_author = next(iter(authors))
+        themes.append(
+            FanoutTheme(
+                display_subject=truncate_subject(display),
+                repo_count=len(repos),
+                commit_count=len(entries),
+                repos=tuple(repos),
+                primary_author=primary_author,
+            )
+        )
+    themes.sort(
+        key=lambda theme: (-theme.repo_count, -theme.commit_count, theme.display_subject.casefold())
+    )
+    return themes
+
+
+def fanout_subject_keys(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    *,
+    min_repo_count: int = FANOUT_MIN_REPO_COUNT,
+) -> set[str]:
+    buckets: dict[str, set[str]] = {}
+    for repo_name, commits, _tags in sections:
+        for commit in commits:
+            key = normalize_subject_key(commit["message"])
+            if not key:
+                continue
+            buckets.setdefault(key, set()).add(repo_name)
+    return {key for key, repos in buckets.items() if len(repos) >= min_repo_count}
+
+
+def collect_notable_commits(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    *,
+    folded_keys: set[str],
+    cap: int = NOTABLE_COMMITS_CAP,
+) -> list[tuple[str, dict[str, str]]]:
+    """Non-fan-out commits for the highlights section (repo order = sort_sections)."""
+    rows: list[tuple[str, dict[str, str]]] = []
+    for repo_name, commits, _tags in sort_sections(sections):
+        for commit in commits:
+            if normalize_subject_key(commit["message"]) in folded_keys:
+                continue
+            rows.append((repo_name, commit))
+            if len(rows) >= cap:
+                return rows
+    return rows
+
+
+def collect_highlight_tags(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    *,
+    cap: int = HIGHLIGHT_TAGS_CAP,
+) -> tuple[list[tuple[str, dict[str, str]]], int]:
+    tags: list[tuple[str, dict[str, str]]] = []
+    for repo_name, _commits, repo_tags in sort_sections(sections):
+        for tag in repo_tags:
+            tags.append((repo_name, tag))
+    if len(tags) <= cap:
+        return tags, 0
+    return tags[:cap], len(tags) - cap
+
+
+def split_summary_rows_top_n(
+    summary_rows: list[tuple[str, int, int, str]],
+    n: int = TOP_REPOS_SUMMARY_N,
+) -> tuple[list[tuple[str, int, int, str]], int, int, int]:
+    """Return (top rows, extra repo count, extra commits, extra tags)."""
+    if len(summary_rows) <= n:
+        return summary_rows, 0, 0, 0
+    top = summary_rows[:n]
+    rest = summary_rows[n:]
+    extra_commits = sum(c for _, c, _, _ in rest)
+    extra_tags = sum(t for _, _, t, _ in rest)
+    return top, len(rest), extra_commits, extra_tags
+
+
+def build_tldr_sentence(
+    scope: str,
+    since_label: str,
+    until_label: str,
+    summary_rows: list[tuple[str, int, int, str]],
+    themes: list[FanoutTheme],
+    *,
+    org_noise_ratio: str | None = None,
+) -> str:
+    org_label = scope.split(":", 1)[-1]
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
+    sentence = (
+        f"**{org_label}** — **{len(summary_rows)}** active repos, "
+        f"**{total_commits}** kept commits, **{total_tags}** tags "
+        f"({since_label} .. {until_label})."
+    )
+    if themes:
+        named = ", ".join(f"“{theme.display_subject}” ({theme.repo_count} repos)" for theme in themes[:3])
+        if len(themes) > 3:
+            named += f", +{len(themes) - 3} more themes"
+        sentence += f" Cross-repo fan-out: {named}."
+    if org_noise_ratio is not None:
+        sentence += f" Noise filter dropped **{org_noise_ratio}** of raw commit/tag volume org-wide."
+    return sentence
+
+
+def format_fanout_theme_line(theme: FanoutTheme) -> str:
+    line = f"- **{theme.display_subject}** — **{theme.repo_count}** repos ({theme.commit_count} commits)"
+    if theme.primary_author:
+        line += f", {theme.primary_author}"
+    return line
+
+
+def format_summary_table_md(summary_rows: list[tuple[str, int, int, str]]) -> list[str]:
+    lines = [
+        "| Repo | Commits | Tags | Noise |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for repo_name, commit_count, tag_count, noise in summary_rows:
+        lines.append(f"| {repo_name} | {commit_count} | {tag_count} | {noise} |")
+    return lines
+
+
+def build_layered_summary_md(
+    since_label: str,
+    until_label: str,
+    tz_name: str,
+    summary_rows: list[tuple[str, int, int, str]],
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+    *,
+    scope: str = "",
+    org_noise_ratio: str | None = None,
+    top_n: int = TOP_REPOS_SUMMARY_N,
+) -> str:
+    themes = group_fanout_themes(sections)
+    folded_keys = fanout_subject_keys(sections)
+    notable = collect_notable_commits(sections, folded_keys=folded_keys)
+    highlight_tags, extra_highlight_tags = collect_highlight_tags(sections)
+    top_rows, extra_repos, extra_commits, extra_tags = split_summary_rows_top_n(summary_rows, top_n)
+
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
+    activity_line = (
+        f"Repos with activity: **{len(summary_rows)}** · "
+        f"Commits: **{total_commits}** · Tags: **{total_tags}**"
+    )
+    if org_noise_ratio is not None:
+        activity_line += f" · Noise: **{org_noise_ratio}**"
+
+    lines = [
+        "## Summary",
+        "",
+    ]
+    if scope:
+        lines.extend([f"**TL;DR:** {build_tldr_sentence(scope, since_label, until_label, summary_rows, themes, org_noise_ratio=org_noise_ratio)}", ""])
+    lines.extend(
+        [
+            f"Window: **{since_label} .. {until_label}** ({tz_name})",
+            activity_line,
+            "",
+        ]
+    )
+
+    if themes:
+        lines.extend(["### Cross-repo themes", ""])
+        for theme in themes:
+            lines.append(format_fanout_theme_line(theme))
+        lines.append("")
+
+    lines.extend(["### Top repositories", ""])
+    lines.extend(format_summary_table_md(top_rows))
+    if extra_repos:
+        lines.append("")
+        lines.append(
+            f"*+{extra_repos} more repos* ({extra_commits} commits, {extra_tags} tags) — see **Full detail**."
+        )
+    lines.append("")
+
+    if highlight_tags or notable:
+        lines.append("### Highlights")
+        lines.append("")
+        if highlight_tags:
+            lines.append("#### Tags / releases")
+            for repo_name, tag in highlight_tags:
+                lines.append(
+                    f"- `{repo_name}` `{tag['name']}` → `{tag['sha']}` ({tag['date']})"
+                )
+            if extra_highlight_tags:
+                lines.append(f"- *+{extra_highlight_tags} more tags in Full detail / CSV*")
+            lines.append("")
+        if notable:
+            lines.append("#### Notable commits")
+            for repo_name, commit in notable:
+                subject = truncate_subject(commit["message"])
+                lines.append(
+                    f"- `{repo_name}` `{commit['sha']}` {subject} — {commit['author']} ({commit['date']})"
+                )
+            lines.append("")
+
+    lines.extend(["---", "", "## Full detail", ""])
+    lines.extend(["### All repositories", ""])
+    lines.extend(format_summary_table_md(summary_rows))
+    lines.extend(["", "---", ""])
+    return "\n".join(lines)
+
+
 def active_sections(
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
 ) -> list[tuple[str, list[dict[str, str]], list[dict[str, str]]]]:
@@ -550,16 +820,38 @@ def build_digest(
     parts = [
         f"# {digest_title(scope, since_label, until_label, tz_name)}",
         "",
-        build_summary_text(
+        build_layered_summary_md(
             since_label,
             until_label,
             tz_name,
             summary_rows,
+            sections,
+            scope=scope,
             org_noise_ratio=org_noise,
         ).rstrip(),
         build_repo_sections_text(sections).rstrip(),
     ]
     return "\n".join(parts).rstrip() + "\n"
+
+
+def _html_summary_table_rows(
+    summary_rows: list[tuple[str, int, int, str]],
+) -> list[str]:
+    rows = [
+        "<table>",
+        "<thead><tr><th align=\"left\">Repo</th><th align=\"right\">Commits</th>"
+        "<th align=\"right\">Tags</th><th align=\"right\">Noise</th></tr></thead>",
+        "<tbody>",
+    ]
+    for repo_name, commit_count, tag_count, noise in summary_rows:
+        rows.append(
+            f"<tr><td>{html.escape(repo_name)}</td>"
+            f"<td align=\"right\">{commit_count}</td>"
+            f"<td align=\"right\">{tag_count}</td>"
+            f"<td align=\"right\">{html.escape(noise)}</td></tr>"
+        )
+    rows.extend(["</tbody>", "</table>"])
+    return rows
 
 
 def build_digest_html(
@@ -572,33 +864,34 @@ def build_digest_html(
     per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None,
 ) -> str:
     summary_rows = build_summary_rows(sections, per_repo_counts=per_repo_counts)
+    org_noise_raw = org_wide_noise_ratio(per_repo_counts) if per_repo_counts else None
+    themes = group_fanout_themes(sections)
+    folded_keys = fanout_subject_keys(sections)
+    notable = collect_notable_commits(sections, folded_keys=folded_keys)
+    highlight_tags, extra_highlight_tags = collect_highlight_tags(sections)
+    top_rows, extra_repos, extra_commits, extra_tags = split_summary_rows_top_n(summary_rows)
+
     total_commits = sum(c for _, c, _, _ in summary_rows)
     total_tags = sum(t for _, _, t, _ in summary_rows)
     title = html.escape(digest_title(scope, since_label, until_label, tz_name))
     window = html.escape(f"{since_label} .. {until_label} ({tz_name})")
-
-    summary_table = [
-        "<table>",
-        "<thead><tr><th align=\"left\">Repo</th><th align=\"right\">Commits</th>"
-        "<th align=\"right\">Tags</th><th align=\"right\">Noise</th></tr></thead>",
-        "<tbody>",
-    ]
-    for repo_name, commit_count, tag_count, noise in summary_rows:
-        summary_table.append(
-            f"<tr><td>{html.escape(repo_name)}</td>"
-            f"<td align=\"right\">{commit_count}</td>"
-            f"<td align=\"right\">{tag_count}</td>"
-            f"<td align=\"right\">{html.escape(noise)}</td></tr>"
+    tldr = html.escape(
+        build_tldr_sentence(
+            scope,
+            since_label,
+            until_label,
+            summary_rows,
+            themes,
+            org_noise_ratio=org_noise_raw,
         )
-    summary_table.extend(["</tbody>", "</table>"])
+    )
 
     activity_bits = (
         f"<strong>Repos with activity:</strong> {len(summary_rows)} · "
         f"<strong>Commits:</strong> {total_commits} · <strong>Tags:</strong> {total_tags}"
     )
-    if per_repo_counts is not None:
-        org_noise = html.escape(org_wide_noise_ratio(per_repo_counts))
-        activity_bits += f" · <strong>Noise:</strong> {org_noise}"
+    if org_noise_raw is not None:
+        activity_bits += f" · <strong>Noise:</strong> {html.escape(org_noise_raw)}"
 
     body_parts = [
         "<!DOCTYPE html>",
@@ -606,35 +899,69 @@ def build_digest_html(
         "<head><meta charset=\"utf-8\"></head>",
         "<body style=\"font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.45; color: #1f2328;\">",
         f"<h1 style=\"font-size: 1.25rem;\">{title}</h1>",
+        f"<p><strong>TL;DR:</strong> {tldr}</p>",
         f"<p><strong>Window:</strong> {window}<br>",
         f"{activity_bits}</p>",
-        "\n".join(summary_table),
-        "<hr>",
+        "<h2 style=\"font-size: 1.05rem;\">Cross-repo themes</h2>",
     ]
 
-    for repo_name, commits, tags in sort_sections(sections):
-        body_parts.append(f"<h2 style=\"font-size: 1.05rem; margin-top: 1.25rem;\">{html.escape(repo_name)}</h2>")
-        if commits:
-            body_parts.append(f"<h3 style=\"font-size: 0.95rem;\">Commits ({len(commits)})</h3><ul>")
-            for row in commits:
-                subject = html.escape(truncate_subject(row["message"]))
-                author = html.escape(row["author"])
-                sha = html.escape(row["sha"])
-                date = html.escape(row["date"])
+    if themes:
+        body_parts.append("<ul>")
+        for theme in themes:
+            line = (
+                f"<strong>{html.escape(theme.display_subject)}</strong> — "
+                f"{theme.repo_count} repos ({theme.commit_count} commits)"
+            )
+            if theme.primary_author:
+                line += f", {html.escape(theme.primary_author)}"
+            body_parts.append(f"<li>{line}</li>")
+        body_parts.append("</ul>")
+    else:
+        body_parts.append("<p><em>None this window.</em></p>")
+
+    body_parts.append("<h2 style=\"font-size: 1.05rem;\">Top repositories</h2>")
+    body_parts.append("\n".join(_html_summary_table_rows(top_rows)))
+    if extra_repos:
+        body_parts.append(
+            f"<p><em>+{extra_repos} more repos ({extra_commits} commits, {extra_tags} tags) — "
+            "see attached Markdown or CSV for full detail.</em></p>"
+        )
+
+    if highlight_tags or notable:
+        body_parts.append("<h2 style=\"font-size: 1.05rem;\">Highlights</h2>")
+        if highlight_tags:
+            body_parts.append("<h3 style=\"font-size: 0.95rem;\">Tags / releases</h3><ul>")
+            for repo_name, tag in highlight_tags:
                 body_parts.append(
-                    f"<li><code>{sha}</code> {subject} — {author} ({date})</li>"
+                    f"<li><code>{html.escape(repo_name)}</code> "
+                    f"<code>{html.escape(tag['name'])}</code> → "
+                    f"<code>{html.escape(tag['sha'])}</code> ({html.escape(tag['date'])})</li>"
+                )
+            if extra_highlight_tags:
+                body_parts.append(
+                    f"<li><em>+{extra_highlight_tags} more tags in Markdown / CSV</em></li>"
                 )
             body_parts.append("</ul>")
-        if tags:
-            body_parts.append(f"<h3 style=\"font-size: 0.95rem;\">Tags ({len(tags)})</h3><ul>")
-            for row in tags:
-                name = html.escape(row["name"])
-                sha = html.escape(row["sha"])
-                date = html.escape(row["date"])
-                body_parts.append(f"<li><code>{name}</code> → <code>{sha}</code> ({date})</li>")
+        if notable:
+            body_parts.append("<h3 style=\"font-size: 0.95rem;\">Notable commits</h3><ul>")
+            for repo_name, commit in notable:
+                subject = html.escape(truncate_subject(commit["message"]))
+                body_parts.append(
+                    f"<li><code>{html.escape(repo_name)}</code> "
+                    f"<code>{html.escape(commit['sha'])}</code> {subject} — "
+                    f"{html.escape(commit['author'])} ({html.escape(commit['date'])})</li>"
+                )
             body_parts.append("</ul>")
 
-    body_parts.extend(["</body>", "</html>"])
+    body_parts.extend(
+        [
+            "<hr>",
+            "<p><em>Per-repo commit lists are in <code>digest.md</code> (Full detail) and "
+            "<code>commit-digest.csv</code>; this HTML is the summary view only.</em></p>",
+            "</body>",
+            "</html>",
+        ]
+    )
     return "\n".join(body_parts) + "\n"
 
 
