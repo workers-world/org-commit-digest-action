@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import csv
 import html
 import io
@@ -21,11 +22,20 @@ import noise_filter
 
 
 META_FILE = ".digest-meta.json"
+HISTORY_META_GLOB = "*.digest-meta.json"
 SUBJECT_MAX_LEN = 72
 TOP_REPOS_SUMMARY_N = 8
 FANOUT_MIN_REPO_COUNT = 2
 NOTABLE_COMMITS_CAP = 12
 HIGHLIGHT_TAGS_CAP = 10
+SPARKLINE_WEEKS = 8
+
+COMMIT_TYPE_ORDER = ("feat", "fix", "chore", "ci", "docs", "release", "other")
+_COMMIT_TYPE_LABEL = re.compile(
+    r"^(feat|fix|chore|ci|docs|refactor|test|build|perf|style|revert|release)(?:\([^)]+\))?!?\s*:",
+    re.IGNORECASE,
+)
+_RELEASE_SUBJECT = re.compile(r"^release:", re.IGNORECASE)
 
 # Fan-out subject matching (see README): conventional prefix, WW-N keys, (#PR) suffix.
 _CONVENTIONAL_COMMIT_PREFIX = re.compile(
@@ -599,6 +609,8 @@ def build_layered_summary_md(
     scope: str = "",
     org_noise_ratio: str | None = None,
     top_n: int = TOP_REPOS_SUMMARY_N,
+    trend: SummaryTrendContext | None = None,
+    type_histogram: Counter[str] | None = None,
 ) -> str:
     themes = group_fanout_themes(sections)
     folded_keys = fanout_subject_keys(sections)
@@ -606,14 +618,11 @@ def build_layered_summary_md(
     highlight_tags, extra_highlight_tags = collect_highlight_tags(sections)
     top_rows, extra_repos, extra_commits, extra_tags = split_summary_rows_top_n(summary_rows, top_n)
 
-    total_commits = sum(c for _, c, _, _ in summary_rows)
-    total_tags = sum(t for _, _, t, _ in summary_rows)
-    activity_line = (
-        f"Repos with activity: **{len(summary_rows)}** · "
-        f"Commits: **{total_commits}** · Tags: **{total_tags}**"
+    activity_line = format_activity_line_with_wow(
+        summary_rows,
+        org_noise_ratio,
+        trend=trend,
     )
-    if org_noise_ratio is not None:
-        activity_line += f" · Noise: **{org_noise_ratio}**"
 
     lines = [
         "## Summary",
@@ -628,6 +637,14 @@ def build_layered_summary_md(
             "",
         ]
     )
+
+    spark_lines = format_sparkline_block_md(trend)
+    if spark_lines:
+        lines.extend(spark_lines)
+        lines.append("")
+
+    if type_histogram is not None:
+        lines.extend(["### Commit types (kept)", "", format_type_rollup_line(type_histogram), ""])
 
     if themes:
         lines.extend(["### Cross-repo themes", ""])
@@ -755,6 +772,431 @@ def org_wide_noise_ratio(
     return format_noise_ratio(raw=raw, kept=kept)
 
 
+def parse_noise_pct(ratio: str | None) -> float | None:
+    if not ratio:
+        return None
+    text = ratio.strip().rstrip("%")
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def parse_window_until(window: str) -> str | None:
+    if ".." not in window:
+        return None
+    return window.split("..", 1)[1].strip()
+
+
+def parse_window_since(window: str) -> str | None:
+    if ".." not in window:
+        return None
+    return window.split("..", 1)[0].strip()
+
+
+def count_kept_rows_from_csv(csv_path: Path) -> tuple[int, int]:
+    commits = 0
+    tags = 0
+    with csv_path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            item_type = (row.get("type") or "").strip()
+            if item_type == "commit":
+                commits += 1
+            elif item_type == "tag":
+                tags += 1
+    return commits, tags
+
+
+def resolve_digest_csv_path(data: dict[str, object], meta_path: Path) -> Path | None:
+    candidates: list[Path] = []
+    raw = data.get("digest-csv-file")
+    if raw:
+        path = Path(str(raw))
+        candidates.extend([path, meta_path.parent / path.name])
+    candidates.append(meta_path.parent / "digest.csv")
+    seen: set[str] = set()
+    for candidate in candidates:
+        try:
+            key = str(candidate.resolve())
+        except OSError:
+            key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def bucket_commit_type(message: str) -> str:
+    if _RELEASE_SUBJECT.match(message.strip()):
+        return "release"
+    match = _COMMIT_TYPE_LABEL.match(message.strip())
+    if not match:
+        return "other"
+    label = match.group(1).lower()
+    if label == "release":
+        return "release"
+    if label in COMMIT_TYPE_ORDER:
+        return label
+    return "other"
+
+
+def build_commit_type_histogram(
+    sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
+) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for _repo, commits, _tags in sections:
+        for row in commits:
+            counts[bucket_commit_type(row["message"])] += 1
+    return counts
+
+
+def format_type_rollup_line(type_counts: Counter[str]) -> str:
+    parts: list[str] = []
+    for key in COMMIT_TYPE_ORDER:
+        count = type_counts.get(key, 0)
+        if count:
+            parts.append(f"**{key}** {count}")
+    return " · ".join(parts) if parts else "_no kept commits_"
+
+
+def summarize_noise_rules(ignored: Counter[str]) -> str:
+    if not ignored:
+        return ""
+    groups: Counter[str] = Counter()
+    for reason, count in ignored.items():
+        prefix = reason.split()[0] if reason else reason
+        groups[prefix] += count
+    parts = [f"{rule} ({groups[rule]})" for rule in sorted(groups)]
+    return ", ".join(parts)
+
+
+def build_kpi_snapshot(
+    summary_rows: list[tuple[str, int, int, str]],
+    *,
+    scope: str,
+    window: str,
+    org_noise_ratio: str | None,
+) -> dict[str, object]:
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
+    return {
+        "scope": scope,
+        "window": window,
+        "active-repos": len(summary_rows),
+        "kept-commits": total_commits,
+        "tags": total_tags,
+        "noise-pct": parse_noise_pct(org_noise_ratio),
+    }
+
+
+def resolve_history_dir(out_file: str, history_dir_input: str) -> Path:
+    if history_dir_input.strip():
+        return Path(history_dir_input.strip())
+    out_path = Path(out_file)
+    if out_path.parent != Path("."):
+        return out_path.parent
+    return Path(".")
+
+
+def history_meta_path(history_dir: Path, until_label: str) -> Path:
+    return history_dir / f"{until_label}.digest-meta.json"
+
+
+def week_dir_meta_path(history_dir: Path, since_label: str, until_label: str) -> Path:
+    return history_dir / "weeks" / f"{since_label}_{until_label}" / META_FILE
+
+
+def iter_history_meta_paths(history_dir: Path) -> list[Path]:
+    """Discover archived meta: flat `{until}.digest-meta.json` and batch `weeks/*/.digest-meta.json`."""
+    if not history_dir.is_dir():
+        return []
+    found: dict[str, Path] = {}
+    patterns = (
+        HISTORY_META_GLOB,
+        f"weeks/*/{META_FILE}",
+        f"weeks/*/*{META_FILE}",
+        f"**/{META_FILE}",
+        "weeks/*/digest-meta.json",
+        "**/digest-meta.json",
+    )
+    for pattern in patterns:
+        for path in history_dir.glob(pattern):
+            if not path.is_file():
+                continue
+            if path.name == META_FILE and path.parent.resolve() == history_dir.resolve():
+                continue
+            found[str(path.resolve())] = path
+    return sorted(found.values(), key=lambda item: str(item))
+
+
+def kpi_from_meta_record(data: dict[str, object], *, meta_path: Path) -> dict[str, object] | None:
+    scope = str(data.get("scope") or "")
+    window = str(data.get("window") or "")
+    if not scope or not window:
+        return None
+    until = parse_window_until(window)
+    if not until:
+        return None
+
+    embedded = data.get("kpi")
+    if isinstance(embedded, dict) and embedded.get("active-repos") is not None:
+        merged: dict[str, object] = dict(embedded)
+    else:
+        has_activity = bool(data.get("has-activity"))
+        active = int(data.get("active-count") or 0)
+        kept_commits = 0
+        tags = 0
+        if has_activity:
+            csv_path = resolve_digest_csv_path(data, meta_path)
+            if csv_path is not None:
+                kept_commits, tags = count_kept_rows_from_csv(csv_path)
+        noise_pct: float | None = None
+        if isinstance(embedded, dict) and embedded.get("noise-pct") is not None:
+            raw_noise = embedded.get("noise-pct")
+            if isinstance(raw_noise, (int, float)):
+                noise_pct = float(raw_noise)
+            elif isinstance(raw_noise, str):
+                noise_pct = parse_noise_pct(raw_noise)
+        merged = {
+            "scope": scope,
+            "window": window,
+            "active-repos": active,
+            "kept-commits": kept_commits,
+            "tags": tags,
+            "noise-pct": noise_pct,
+        }
+
+    merged["window"] = window
+    merged["scope"] = scope
+    merged["_until"] = until
+    merged["_since"] = parse_window_since(window)
+    return merged
+
+
+def load_kpi_history(
+    history_dir: Path,
+    scope: str,
+    *,
+    exclude_window: str | None = None,
+) -> list[dict[str, object]]:
+    snapshots: list[dict[str, object]] = []
+    seen_windows: set[str] = set()
+    for path in iter_history_meta_paths(history_dir):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        if data.get("scope") != scope:
+            continue
+        merged = kpi_from_meta_record(data, meta_path=path)
+        if merged is None:
+            continue
+        window = str(merged.get("window") or "")
+        if exclude_window and window == exclude_window:
+            continue
+        if window in seen_windows:
+            continue
+        seen_windows.add(window)
+        snapshots.append(merged)
+    snapshots.sort(key=lambda item: str(item.get("_until", "")))
+    return snapshots
+
+
+def find_prior_week_kpi(
+    history: list[dict[str, object]],
+    since_label: str,
+) -> dict[str, object] | None:
+    """Prior Mon–Mon window: snapshot whose window ends on this run's ``since`` date."""
+    for snap in history:
+        if str(snap.get("_until")) == since_label:
+            return snap
+    return None
+
+
+def select_prior_week_kpi(history: list[dict[str, object]]) -> dict[str, object] | None:
+    if not history:
+        return None
+    return history[-1]
+
+
+def persist_history_meta(
+    history_dir: Path,
+    since_label: str,
+    until_label: str,
+    payload: dict[str, object],
+) -> None:
+    history_dir.mkdir(parents=True, exist_ok=True)
+    write_meta(history_meta_path(history_dir, until_label), payload)
+    week_path = week_dir_meta_path(history_dir, since_label, until_label)
+    week_path.parent.mkdir(parents=True, exist_ok=True)
+    write_meta(week_path, payload)
+
+
+def wow_delta_pct(current: float | int, previous: float | int | None) -> float | None:
+    if previous is None:
+        return None
+    if previous == 0:
+        if current == 0:
+            return 0.0
+        return None
+    return 100.0 * (float(current) - float(previous)) / float(previous)
+
+
+def format_wow_suffix(delta_pct: float | None) -> str:
+    if delta_pct is None:
+        return ""
+    if delta_pct == 0:
+        return " (→0%)"
+    arrow = "↑" if delta_pct > 0 else "↓"
+    return f" ({arrow}{abs(delta_pct):.1f}% vs last week)"
+
+
+def sparkline_ascii(values: list[int], *, width: int = SPARKLINE_WEEKS) -> str:
+    if not values:
+        return ""
+    vals = values[-width:]
+    if len(vals) < width:
+        vals = [0] * (width - len(vals)) + vals
+    mn, mx = min(vals), max(vals)
+    chars = "▁▂▃▄▅▆▇█"
+    if mx == mn:
+        return chars[0] * len(vals) if mx == 0 else chars[len(chars) // 2] * len(vals)
+    out: list[str] = []
+    for value in vals:
+        idx = int((value - mn) / (mx - mn) * (len(chars) - 1))
+        out.append(chars[idx])
+    return "".join(out)
+
+
+def sparkline_svg_data_uri(values: list[int], *, width: int = 72, height: int = 18) -> str:
+    if not values:
+        values = [0]
+    vals = values[-SPARKLINE_WEEKS:]
+    if len(vals) < 2:
+        vals = [vals[0], vals[0]]
+    mn, mx = min(vals), max(vals)
+    pad = 2
+    inner_w = max(width - 2 * pad, 1)
+    inner_h = max(height - 2 * pad, 1)
+    points: list[str] = []
+    for i, value in enumerate(vals):
+        x = pad + (i / (len(vals) - 1)) * inner_w
+        if mx == mn:
+            y = pad + inner_h / 2
+        else:
+            y = pad + (1 - (value - mn) / (mx - mn)) * inner_h
+        points.append(f"{x:.1f},{y:.1f}")
+    polyline = " ".join(points)
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}">'
+        f'<polyline fill="none" stroke="#0969da" stroke-width="1.5" points="{polyline}"/>'
+        "</svg>"
+    )
+    encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
+def build_sparkline_series(
+    history: list[dict[str, object]],
+    current: dict[str, object],
+    field: str,
+) -> list[int]:
+    series: list[int] = []
+    for snap in history:
+        raw = snap.get(field)
+        if isinstance(raw, (int, float)):
+            series.append(int(raw))
+    raw_current = current.get(field)
+    if isinstance(raw_current, (int, float)):
+        series.append(int(raw_current))
+    return series[-SPARKLINE_WEEKS:]
+
+
+@dataclass(frozen=True)
+class SummaryTrendContext:
+    prior_kpi: dict[str, object] | None
+    history: list[dict[str, object]]
+    current_kpi: dict[str, object]
+    noise_rule_summary: str | None = None
+
+
+def format_activity_line_with_wow(
+    summary_rows: list[tuple[str, int, int, str]],
+    org_noise_ratio: str | None,
+    *,
+    trend: SummaryTrendContext | None,
+) -> str:
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
+    active = len(summary_rows)
+    prior = trend.prior_kpi if trend else None
+
+    active_suffix = format_wow_suffix(
+        wow_delta_pct(active, prior.get("active-repos") if prior else None)  # type: ignore[arg-type]
+    )
+    commits_suffix = format_wow_suffix(
+        wow_delta_pct(total_commits, prior.get("kept-commits") if prior else None)  # type: ignore[arg-type]
+    )
+    tags_suffix = format_wow_suffix(
+        wow_delta_pct(total_tags, prior.get("tags") if prior else None)  # type: ignore[arg-type]
+    )
+
+    activity_line = (
+        f"Repos with activity: **{active}**{active_suffix} · "
+        f"Commits: **{total_commits}**{commits_suffix} · Tags: **{total_tags}**{tags_suffix}"
+    )
+    if org_noise_ratio is not None:
+        noise_val = parse_noise_pct(org_noise_ratio)
+        prior_noise = prior.get("noise-pct") if prior else None
+        noise_suffix = ""
+        if isinstance(prior_noise, (int, float)) and noise_val is not None:
+            noise_suffix = format_wow_suffix(wow_delta_pct(noise_val, prior_noise))
+        activity_line += f" · Noise: **{org_noise_ratio}**{noise_suffix}"
+        if trend and trend.noise_rule_summary:
+            activity_line += f" — _{trend.noise_rule_summary}_"
+    return activity_line
+
+
+def markdown_inline_to_html(text: str) -> str:
+    parts: list[str] = []
+    rest = text
+    while rest:
+        bold = re.search(r"\*\*([^*]+)\*\*", rest)
+        italic = re.search(r"_([^_]+)_", rest)
+        candidates = [(m, "bold") for m in [bold] if m] + [(m, "italic") for m in [italic] if m]
+        if not candidates:
+            parts.append(html.escape(rest))
+            break
+        match, kind = min(candidates, key=lambda item: item[0].start())
+        parts.append(html.escape(rest[: match.start()]))
+        if kind == "bold":
+            parts.append(f"<strong>{html.escape(match.group(1))}</strong>")
+        else:
+            parts.append(f"<em>{html.escape(match.group(1))}</em>")
+        rest = rest[match.end() :]
+    return "".join(parts)
+
+
+def format_sparkline_block_md(trend: SummaryTrendContext | None) -> list[str]:
+    if trend is None or not trend.history:
+        return []
+    commit_series = build_sparkline_series(trend.history, trend.current_kpi, "kept-commits")
+    repo_series = build_sparkline_series(trend.history, trend.current_kpi, "active-repos")
+    if not any(commit_series) and not any(repo_series):
+        return []
+    return [
+        f"Trend ({min(SPARKLINE_WEEKS, len(commit_series))}w): "
+        f"commits `{sparkline_ascii(commit_series)}` · "
+        f"repos `{sparkline_ascii(repo_series)}`",
+    ]
+
+
 def build_summary_text(
     since_label: str,
     until_label: str,
@@ -814,9 +1256,13 @@ def build_digest(
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
     *,
     per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None,
+    trend: SummaryTrendContext | None = None,
+    type_histogram: Counter[str] | None = None,
 ) -> str:
     summary_rows = build_summary_rows(sections, per_repo_counts=per_repo_counts)
     org_noise = org_wide_noise_ratio(per_repo_counts) if per_repo_counts else None
+    if type_histogram is None:
+        type_histogram = build_commit_type_histogram(sections)
     parts = [
         f"# {digest_title(scope, since_label, until_label, tz_name)}",
         "",
@@ -828,6 +1274,8 @@ def build_digest(
             sections,
             scope=scope,
             org_noise_ratio=org_noise,
+            trend=trend,
+            type_histogram=type_histogram,
         ).rstrip(),
         build_repo_sections_text(sections).rstrip(),
     ]
@@ -836,20 +1284,27 @@ def build_digest(
 
 def _html_summary_table_rows(
     summary_rows: list[tuple[str, int, int, str]],
+    *,
+    include_noise: bool = True,
 ) -> list[str]:
-    rows = [
-        "<table>",
+    header = (
         "<thead><tr><th align=\"left\">Repo</th><th align=\"right\">Commits</th>"
-        "<th align=\"right\">Tags</th><th align=\"right\">Noise</th></tr></thead>",
-        "<tbody>",
-    ]
+        "<th align=\"right\">Tags</th>"
+    )
+    if include_noise:
+        header += "<th align=\"right\">Noise</th>"
+    header += "</tr></thead>"
+    rows = ["<table>", header, "<tbody>"]
     for repo_name, commit_count, tag_count, noise in summary_rows:
-        rows.append(
+        row = (
             f"<tr><td>{html.escape(repo_name)}</td>"
             f"<td align=\"right\">{commit_count}</td>"
             f"<td align=\"right\">{tag_count}</td>"
-            f"<td align=\"right\">{html.escape(noise)}</td></tr>"
         )
+        if include_noise:
+            row += f"<td align=\"right\">{html.escape(noise)}</td>"
+        row += "</tr>"
+        rows.append(row)
     rows.extend(["</tbody>", "</table>"])
     return rows
 
@@ -862,17 +1317,19 @@ def build_digest_html(
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
     *,
     per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None,
+    trend: SummaryTrendContext | None = None,
+    type_histogram: Counter[str] | None = None,
 ) -> str:
     summary_rows = build_summary_rows(sections, per_repo_counts=per_repo_counts)
     org_noise_raw = org_wide_noise_ratio(per_repo_counts) if per_repo_counts else None
+    if type_histogram is None:
+        type_histogram = build_commit_type_histogram(sections)
     themes = group_fanout_themes(sections)
     folded_keys = fanout_subject_keys(sections)
     notable = collect_notable_commits(sections, folded_keys=folded_keys)
     highlight_tags, extra_highlight_tags = collect_highlight_tags(sections)
     top_rows, extra_repos, extra_commits, extra_tags = split_summary_rows_top_n(summary_rows)
 
-    total_commits = sum(c for _, c, _, _ in summary_rows)
-    total_tags = sum(t for _, _, t, _ in summary_rows)
     title = html.escape(digest_title(scope, since_label, until_label, tz_name))
     window = html.escape(f"{since_label} .. {until_label} ({tz_name})")
     tldr = html.escape(
@@ -886,12 +1343,14 @@ def build_digest_html(
         )
     )
 
-    activity_bits = (
-        f"<strong>Repos with activity:</strong> {len(summary_rows)} · "
-        f"<strong>Commits:</strong> {total_commits} · <strong>Tags:</strong> {total_tags}"
+    activity_md = format_activity_line_with_wow(
+        summary_rows,
+        org_noise_raw,
+        trend=trend,
     )
-    if org_noise_raw is not None:
-        activity_bits += f" · <strong>Noise:</strong> {html.escape(org_noise_raw)}"
+    activity_bits = markdown_inline_to_html(activity_md)
+    if trend and trend.noise_rule_summary and trend.noise_rule_summary not in activity_md:
+        activity_bits += f"<br><em>Noise rules: {html.escape(trend.noise_rule_summary)}</em>"
 
     body_parts = [
         "<!DOCTYPE html>",
@@ -902,8 +1361,26 @@ def build_digest_html(
         f"<p><strong>TL;DR:</strong> {tldr}</p>",
         f"<p><strong>Window:</strong> {window}<br>",
         f"{activity_bits}</p>",
-        "<h2 style=\"font-size: 1.05rem;\">Cross-repo themes</h2>",
     ]
+
+    if trend and trend.history:
+        commit_series = build_sparkline_series(trend.history, trend.current_kpi, "kept-commits")
+        repo_series = build_sparkline_series(trend.history, trend.current_kpi, "active-repos")
+        body_parts.append("<p style=\"font-size: 0.9rem;\">")
+        body_parts.append("<strong>Trend:</strong> ")
+        body_parts.append(
+            f'commits <img alt="commits trend" width="72" height="18" '
+            f'src="{sparkline_svg_data_uri(commit_series)}" /> · '
+            f'repos <img alt="repos trend" width="72" height="18" '
+            f'src="{sparkline_svg_data_uri(repo_series)}" />'
+        )
+        body_parts.append("</p>")
+
+    if type_histogram:
+        body_parts.append("<h2 style=\"font-size: 1.05rem;\">Commit types (kept)</h2>")
+        body_parts.append(f"<p>{markdown_inline_to_html(format_type_rollup_line(type_histogram))}</p>")
+
+    body_parts.append("<h2 style=\"font-size: 1.05rem;\">Cross-repo themes</h2>")
 
     if themes:
         body_parts.append("<ul>")
@@ -920,7 +1397,7 @@ def build_digest_html(
         body_parts.append("<p><em>None this window.</em></p>")
 
     body_parts.append("<h2 style=\"font-size: 1.05rem;\">Top repositories</h2>")
-    body_parts.append("\n".join(_html_summary_table_rows(top_rows)))
+    body_parts.append("\n".join(_html_summary_table_rows(top_rows, include_noise=False)))
     if extra_repos:
         body_parts.append(
             f"<p><em>+{extra_repos} more repos ({extra_commits} commits, {extra_tags} tags) — "
@@ -1124,6 +1601,7 @@ def main() -> int:
 
     had_raw_activity = bool(sections)
     per_repo_counts: dict[str, tuple[int, int, int, int]] | None = None
+    ignored_counts: Counter[str] = Counter()
     if noise_filter_enabled and sections:
         files_cache = CommitFilesCache()
         sections, ignored_counts, per_repo_counts = noise_filter.filter_digest_rows(
@@ -1135,24 +1613,54 @@ def main() -> int:
         log_noise_filter_stats(ignored_counts, verbose=verbose)
         active = sum(1 for counts in per_repo_counts.values() if repo_kept_total(counts) > 0)
 
+    history_dir_input = os.environ.get("INPUT_HISTORY_DIR", "")
     meta_path = Path(META_FILE)
+    history_dir = resolve_history_dir(out_file, history_dir_input)
+    window_label = f"{since_label}..{until_label}"
     if not had_raw_activity:
         message = f"no activity in window {since_label}..{until_label} {tz_name} ({scanned} repos scanned)"
         print(message)
-        write_meta(
-            meta_path,
-            {
-                "digest-file": "",
-                "subject": "",
-                "repo-count": scanned,
-                "active-count": 0,
-                "scope": scope,
-                "has-activity": False,
-                "window": f"{since_label}..{until_label}",
-                "timezone": tz_name,
-            },
-        )
+        empty_kpi: dict[str, object] = {
+            "scope": scope,
+            "window": window_label,
+            "active-repos": 0,
+            "kept-commits": 0,
+            "tags": 0,
+            "noise-pct": None,
+        }
+        meta_payload = {
+            "digest-file": "",
+            "subject": "",
+            "repo-count": scanned,
+            "active-count": 0,
+            "scope": scope,
+            "has-activity": False,
+            "window": window_label,
+            "timezone": tz_name,
+            "kpi": empty_kpi,
+            "history-dir": str(history_dir),
+        }
+        write_meta(meta_path, meta_payload)
+        persist_history_meta(history_dir, since_label, until_label, meta_payload)
         return 0
+
+    summary_rows = build_summary_rows(sections, per_repo_counts=per_repo_counts)
+    org_noise = org_wide_noise_ratio(per_repo_counts) if per_repo_counts else None
+    current_kpi = build_kpi_snapshot(
+        summary_rows,
+        scope=scope,
+        window=window_label,
+        org_noise_ratio=org_noise,
+    )
+    kpi_history = load_kpi_history(history_dir, scope, exclude_window=window_label)
+    prior_kpi = find_prior_week_kpi(kpi_history, since_label)
+    noise_rule_summary = summarize_noise_rules(ignored_counts) or None
+    trend = SummaryTrendContext(
+        prior_kpi=prior_kpi,
+        history=kpi_history,
+        current_kpi=current_kpi,
+        noise_rule_summary=noise_rule_summary,
+    )
 
     digest_text = build_digest(
         scope,
@@ -1161,6 +1669,7 @@ def main() -> int:
         tz_name,
         sections,
         per_repo_counts=per_repo_counts,
+        trend=trend,
     )
     html_file = html_path_for_digest(out_file)
     csv_file = csv_path_for_digest(out_file)
@@ -1171,27 +1680,29 @@ def main() -> int:
         tz_name,
         sections,
         per_repo_counts=per_repo_counts,
+        trend=trend,
     )
     digest_csv = build_digest_csv(since_label, until_label, tz_name, sections)
     Path(out_file).write_text(digest_text, encoding="utf-8")
     html_file.write_text(digest_html, encoding="utf-8")
     csv_file.write_text(digest_csv, encoding="utf-8")
     subject = f"[{scope.split(':', 1)[-1]}] weekly digest {since_label}..{until_label}"
-    write_meta(
-        meta_path,
-        {
-            "digest-file": out_file,
-            "digest-html-file": str(html_file),
-            "digest-csv-file": str(csv_file),
-            "subject": subject,
-            "repo-count": scanned,
-            "active-count": active,
-            "scope": scope,
-            "has-activity": True,
-            "window": f"{since_label}..{until_label}",
-            "timezone": tz_name,
-        },
-    )
+    meta_payload: dict[str, object] = {
+        "digest-file": out_file,
+        "digest-html-file": str(html_file),
+        "digest-csv-file": str(csv_file),
+        "subject": subject,
+        "repo-count": scanned,
+        "active-count": active,
+        "scope": scope,
+        "has-activity": True,
+        "window": window_label,
+        "timezone": tz_name,
+        "kpi": current_kpi,
+        "history-dir": str(history_dir),
+    }
+    write_meta(meta_path, meta_payload)
+    persist_history_meta(history_dir, since_label, until_label, meta_payload)
     maybe_write_summary(digest_text, verbose)
     print(f"digest written: {out_file} ({active} active / {scanned} scanned)")
     return 0
