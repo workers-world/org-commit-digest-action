@@ -110,6 +110,31 @@ class HistoryHelperTests(unittest.TestCase):
         self.assertEqual(prior.get("_until"), "2026-09-28")
         self.assertEqual(prior.get("active-repos"), 34)
 
+    def test_slim_seed_meta_window_and_snake_kpi(self) -> None:
+        repo_history = Path(__file__).resolve().parent.parent / "digest-history"
+        if not repo_history.is_dir():
+            self.skipTest("digest-history seed not committed")
+        data = {
+            "scope": "org:workers-world",
+            "window": {"since": "2026-09-21", "until": "2026-09-28"},
+            "has-activity": True,
+            "active-count": 34,
+            "kpi": {
+                "active_repos": 34,
+                "kept_commits": 325,
+                "tags": 4,
+                "org_noise_ratio": None,
+            },
+        }
+        kpi = kpi_from_meta_record(data, meta_path=repo_history / "2026-09-28.digest-meta.json")
+        assert kpi is not None
+        self.assertEqual(kpi["active-repos"], 34)
+        self.assertEqual(kpi["kept-commits"], 325)
+        self.assertEqual(kpi["tags"], 4)
+        self.assertEqual(kpi["_until"], "2026-09-28")
+        loaded = load_kpi_history(repo_history, "org:workers-world", exclude_window="2099-01-01..2099-01-08")
+        self.assertGreaterEqual(len(loaded), 90)
+
     def test_load_and_select_prior(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             history = Path(tmp)

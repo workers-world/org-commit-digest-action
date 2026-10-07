@@ -782,6 +782,32 @@ def parse_noise_pct(ratio: str | None) -> float | None:
         return None
 
 
+def normalize_window_label(window: object) -> str | None:
+    if isinstance(window, str):
+        text = window.strip()
+        return text if text else None
+    if isinstance(window, dict):
+        since = str(window.get("since") or "").strip()
+        until = str(window.get("until") or "").strip()
+        if since and until:
+            return f"{since}..{until}"
+    return None
+
+
+def normalize_kpi_embedded(embedded: dict[str, object]) -> dict[str, object]:
+    """Accept slim seed metas (snake_case keys) and canonical hyphenated KPI fields."""
+    out = dict(embedded)
+    alias = (
+        ("active_repos", "active-repos"),
+        ("kept_commits", "kept-commits"),
+        ("org_noise_ratio", "noise-pct"),
+    )
+    for old_key, new_key in alias:
+        if old_key in out and new_key not in out:
+            out[new_key] = out.pop(old_key)
+    return out
+
+
 def parse_window_until(window: str) -> str | None:
     if ".." not in window:
         return None
@@ -934,7 +960,7 @@ def iter_history_meta_paths(history_dir: Path) -> list[Path]:
 
 def kpi_from_meta_record(data: dict[str, object], *, meta_path: Path) -> dict[str, object] | None:
     scope = str(data.get("scope") or "")
-    window = str(data.get("window") or "")
+    window = normalize_window_label(data.get("window"))
     if not scope or not window:
         return None
     until = parse_window_until(window)
@@ -942,6 +968,8 @@ def kpi_from_meta_record(data: dict[str, object], *, meta_path: Path) -> dict[st
         return None
 
     embedded = data.get("kpi")
+    if isinstance(embedded, dict):
+        embedded = normalize_kpi_embedded(embedded)
     if isinstance(embedded, dict) and embedded.get("active-repos") is not None:
         merged: dict[str, object] = dict(embedded)
     else:
