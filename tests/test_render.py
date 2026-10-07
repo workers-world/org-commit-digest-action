@@ -59,9 +59,11 @@ class BuildDigestTests(unittest.TestCase):
         summary_pos = text.index("## Summary")
         alpha_pos = text.index("## alpha")
         self.assertLess(summary_pos, alpha_pos)
+        self.assertIn("**TL;DR:**", text)
         self.assertIn("Window: **2026-09-29 .. 2026-10-06** (Asia/Shanghai)", text)
         self.assertIn("| alpha | 2 | 1 | 0.0% |", text)
         self.assertIn("| beta | 1 | 0 | 0.0% |", text)
+        self.assertIn("## Full detail", text)
         self.assertNotIn("## quiet", text)
 
     def test_summary_table_sorted_by_commit_count_desc(self) -> None:
@@ -87,7 +89,8 @@ class BuildDigestTests(unittest.TestCase):
     def test_commits_before_tags_and_truncated_subject(self) -> None:
         text = build_digest("org:o", "2026-09-29", "2026-10-06", "UTC", SECTIONS)
         self.assertIn("### Commits (2)", text)
-        self.assertLess(text.index("### Commits"), text.index("### Tags"))
+        alpha_block = text[text.index("## alpha") :]
+        self.assertLess(alpha_block.index("### Commits"), alpha_block.index("### Tags"))
         self.assertIn("feat: " + "x" * 60, text)
         self.assertNotIn("x" * 100, text)
 
@@ -153,13 +156,16 @@ class BuildDigestHtmlTests(unittest.TestCase):
     def test_html_summary_table_and_sections(self) -> None:
         html = build_digest_html("org:o", "2026-09-29", "2026-10-06", "Asia/Shanghai", SECTIONS)
         self.assertIn("<!DOCTYPE html>", html)
+        self.assertIn("<strong>TL;DR:</strong>", html)
         self.assertIn("<strong>Window:</strong>", html)
         self.assertIn("2026-09-29 .. 2026-10-06 (Asia/Shanghai)", html)
         self.assertIn("<td>alpha</td>", html)
         self.assertIn("<th align=\"right\">Noise</th>", html)
-        self.assertIn("Commits (2)", html)
+        self.assertIn("Tags / releases", html)
+        self.assertIn("<code>v1.0.0</code>", html)
+        self.assertIn("Notable commits", html)
         self.assertIn("<code>abc1234</code>", html)
-        self.assertLess(html.index("Commits (2)"), html.index("Tags (1)"))
+        self.assertNotIn("Commits (2)", html)
         self.assertNotIn("quiet", html)
 
     def test_html_escapes_special_chars(self) -> None:
