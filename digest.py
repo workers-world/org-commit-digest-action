@@ -14,7 +14,7 @@ import subprocess
 import sys
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -189,19 +189,84 @@ def parse_window_value(value: str, tz_name: str) -> datetime:
     return local.astimezone(timezone.utc)
 
 
+def monday_on_or_before(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def local_midnight(day: date, tz: ZoneInfo) -> datetime:
+    return datetime.combine(day, time.min, tzinfo=tz)
+
+
+def is_scheduled_weekly_run() -> bool:
+    return os.environ.get("GITHUB_EVENT_NAME", "").strip() == "schedule"
+
+
+def default_scheduled_mon_mon_window(
+    now_local: datetime,
+    tz: ZoneInfo,
+) -> tuple[datetime, datetime]:
+    """Last completed Mon–Mon window when the weekly cron fires on Monday."""
+    this_monday = monday_on_or_before(now_local.date())
+    since_day = this_monday - timedelta(days=7)
+    since = local_midnight(since_day, tz).astimezone(timezone.utc)
+    until = local_midnight(this_monday, tz).astimezone(timezone.utc)
+    return since, until
+
+
+def default_ad_hoc_window(
+    now_local: datetime,
+    tz: ZoneInfo,
+) -> tuple[datetime, datetime]:
+    """Mid-week preview: current week from Monday through today (in timezone)."""
+    today = now_local.date()
+    since_day = monday_on_or_before(today)
+    since = local_midnight(since_day, tz).astimezone(timezone.utc)
+    until = local_midnight(today, tz).astimezone(timezone.utc)
+    return since, until
+
+
+def cap_until_to_local_date(until: datetime, *, today: date, tz: ZoneInfo) -> datetime:
+    until_day = until.astimezone(tz).date()
+    if until_day <= today:
+        return until
+    return local_midnight(today, tz).astimezone(timezone.utc)
+
+
 def resolve_window(
     since_raw: str,
     until_raw: str,
     tz_name: str,
+    *,
+    now: datetime | None = None,
 ) -> tuple[datetime, datetime, str, str]:
     tz = ZoneInfo(tz_name)
-    now_local = datetime.now(tz)
-    until = parse_window_value(until_raw, tz_name) if until_raw.strip() else now_local.astimezone(timezone.utc)
-    if since_raw.strip():
-        since = parse_window_value(since_raw, tz_name)
+    now_local = (now if now is not None else datetime.now(tz)).astimezone(tz)
+    today = now_local.date()
+    since_text = since_raw.strip()
+    until_text = until_raw.strip()
+    scheduled = is_scheduled_weekly_run()
+
+    if not since_text and not until_text:
+        if scheduled:
+            since, until = default_scheduled_mon_mon_window(now_local, tz)
+        else:
+            since, until = default_ad_hoc_window(now_local, tz)
     else:
-        since_local = now_local - timedelta(days=7)
-        since = since_local.astimezone(timezone.utc)
+        if until_text:
+            until = parse_window_value(until_text, tz_name)
+        else:
+            until = local_midnight(today, tz).astimezone(timezone.utc)
+        if not scheduled:
+            until = cap_until_to_local_date(until, today=today, tz=tz)
+        if since_text:
+            since = parse_window_value(since_text, tz_name)
+        elif not until_text:
+            since_local = now_local - timedelta(days=7)
+            since = since_local.astimezone(timezone.utc)
+        else:
+            until_day = until.astimezone(tz).date()
+            since_day = monday_on_or_before(until_day) if not scheduled else until_day - timedelta(days=7)
+            since = local_midnight(since_day, tz).astimezone(timezone.utc)
 
     if since > until:
         raise SystemExit("since must be before until")

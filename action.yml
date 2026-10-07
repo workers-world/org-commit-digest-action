@@ -22,11 +22,11 @@ inputs:
     required: false
     default: UTC
   since:
-    description: Window start (YYYY-MM-DD or ISO); empty = 7 days ago in timezone
+    description: Window start (YYYY-MM-DD or ISO); empty with until empty = Mon–Mon (scheduled) or week-to-date (local/dispatch)
     required: false
     default: ''
   until:
-    description: Window end; empty = now in timezone
+    description: Window end; empty with since empty = this Monday (scheduled) or today (local/dispatch); ad-hoc runs cap future dates to today
     required: false
     default: ''
   include-merges:
