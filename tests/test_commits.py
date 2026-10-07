@@ -119,7 +119,8 @@ class BuildDigestTests(unittest.TestCase):
             ],
         )
         self.assertIn("### Commits (1)", text)
-        self.assertLess(text.index("### Commits"), text.index("### Tags"))
+        repo_block = text[text.index("## repo") :]
+        self.assertLess(repo_block.index("### Commits"), repo_block.index("### Tags"))
 
 
 if __name__ == "__main__":
