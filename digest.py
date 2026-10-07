@@ -30,6 +30,27 @@ NOTABLE_COMMITS_CAP = 12
 HIGHLIGHT_TAGS_CAP = 10
 SPARKLINE_WEEKS = 8
 
+# Inline palette for email-safe HTML digests
+HTML_COLOR_UP = "#1a7f37"
+HTML_COLOR_DOWN = "#cf222e"
+HTML_COLOR_FLAT = "#656d76"
+HTML_COLOR_TAG_BG = "#ddf4ff"
+HTML_COLOR_TAG_FG = "#0550ae"
+HTML_COLOR_CHART_COMMITS = "#0969da"
+HTML_COLOR_CHART_REPOS = "#8250df"
+HTML_TABLE_STYLE = (
+    'style="border-collapse:collapse; width:100%; max-width:640px; '
+    'font-size:0.9rem; border:1px solid #d0d7de;"'
+)
+HTML_TH_STYLE = (
+    'style="background:#f6f8fa; border-bottom:1px solid #d0d7de; '
+    'padding:6px 10px; font-weight:600;"'
+)
+HTML_TD_STYLE = 'style="border-bottom:1px solid #eaeef2; padding:6px 10px;"'
+HTML_TD_RIGHT_STYLE = (
+    'style="border-bottom:1px solid #eaeef2; padding:6px 10px; text-align:right;"'
+)
+
 COMMIT_TYPE_ORDER = ("feat", "fix", "chore", "ci", "docs", "release", "other")
 _COMMIT_TYPE_LABEL = re.compile(
     r"^(feat|fix|chore|ci|docs|refactor|test|build|perf|style|revert|release)(?:\([^)]+\))?!?\s*:",
@@ -1225,6 +1246,281 @@ def format_sparkline_block_md(trend: SummaryTrendContext | None) -> list[str]:
     ]
 
 
+def format_wow_suffix_html(delta_pct: float | None) -> str:
+    text = format_wow_suffix(delta_pct)
+    if not text:
+        return ""
+    if delta_pct is None:
+        return html.escape(text)
+    color = HTML_COLOR_FLAT
+    if delta_pct > 0:
+        color = HTML_COLOR_UP
+    elif delta_pct < 0:
+        color = HTML_COLOR_DOWN
+    return f'<span style="color:{color};">{html.escape(text)}</span>'
+
+
+def format_noise_value_html(noise_str: str) -> str:
+    pct = parse_noise_pct(noise_str)
+    color = "#1f2328"
+    if pct is not None:
+        if pct >= 60:
+            color = HTML_COLOR_DOWN
+        elif pct >= 30:
+            color = "#bf8700"
+    return f'<strong style="color:{color};">{html.escape(noise_str)}</strong>'
+
+
+def format_activity_line_html(
+    summary_rows: list[tuple[str, int, int, str]],
+    org_noise_ratio: str | None,
+    *,
+    trend: SummaryTrendContext | None,
+) -> str:
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
+    active = len(summary_rows)
+    prior = trend.prior_kpi if trend else None
+
+    active_suffix = format_wow_suffix_html(
+        wow_delta_pct(active, prior.get("active-repos") if prior else None)  # type: ignore[arg-type]
+    )
+    commits_suffix = format_wow_suffix_html(
+        wow_delta_pct(total_commits, prior.get("kept-commits") if prior else None)  # type: ignore[arg-type]
+    )
+    tags_suffix = format_wow_suffix_html(
+        wow_delta_pct(total_tags, prior.get("tags") if prior else None)  # type: ignore[arg-type]
+    )
+
+    parts = [
+        f"Repos with activity: <strong>{active}</strong>{active_suffix}",
+        f"Commits: <strong>{total_commits}</strong>{commits_suffix}",
+        f"Tags: <strong>{total_tags}</strong>{tags_suffix}",
+    ]
+    if org_noise_ratio is not None:
+        noise_val = parse_noise_pct(org_noise_ratio)
+        prior_noise = prior.get("noise-pct") if prior else None
+        noise_suffix = ""
+        if isinstance(prior_noise, (int, float)) and noise_val is not None:
+            noise_suffix = format_wow_suffix_html(wow_delta_pct(noise_val, prior_noise))
+        parts.append(f"Noise: {format_noise_value_html(org_noise_ratio)}{noise_suffix}")
+        if trend and trend.noise_rule_summary:
+            parts.append(
+                f'<em style="color:{HTML_COLOR_FLAT};">{html.escape(trend.noise_rule_summary)}</em>'
+            )
+    return " · ".join(parts)
+
+
+def html_inline_code(text: str, *, variant: str = "default") -> str:
+    if variant == "tag":
+        style = (
+            f"background:{HTML_COLOR_TAG_BG}; color:{HTML_COLOR_TAG_FG}; "
+            "padding:1px 5px; border-radius:3px; font-size:0.85em;"
+        )
+    else:
+        style = "background:#f6f8fa; padding:1px 4px; border-radius:3px; font-size:0.85em;"
+    return f'<code style="{style}">{html.escape(text)}</code>'
+
+
+def format_type_rollup_html_table(type_counts: Counter[str]) -> str:
+    rows: list[tuple[str, int]] = []
+    for key in COMMIT_TYPE_ORDER:
+        count = type_counts.get(key, 0)
+        if count:
+            rows.append((key, count))
+    if not rows:
+        return "<p><em>no kept commits</em></p>"
+    body: list[str] = [
+        f"<table {HTML_TABLE_STYLE}>",
+        (
+            f"<thead><tr>"
+            f'<th align="left" {HTML_TH_STYLE}>Type</th>'
+            f'<th align="right" {HTML_TH_STYLE}>Count</th>'
+            f"</tr></thead>"
+        ),
+        "<tbody>",
+    ]
+    for idx, (key, count) in enumerate(rows):
+        zebra = ' style="background:#f6f8fa;"' if idx % 2 else ""
+        body.append(
+            f"<tr{zebra}>"
+            f'<td {HTML_TD_STYLE}><strong>{html.escape(key)}</strong></td>'
+            f'<td {HTML_TD_RIGHT_STYLE}>{count}</td>'
+            f"</tr>"
+        )
+    body.extend(["</tbody>", "</table>"])
+    return "\n".join(body)
+
+
+def format_chart_date_label(until_label: str) -> str:
+    parts = until_label.split("-")
+    if len(parts) == 3:
+        try:
+            return f"{int(parts[1])}/{int(parts[2])}"
+        except ValueError:
+            pass
+    return until_label
+
+
+def build_trend_datasets(
+    history: list[dict[str, object]],
+    current_kpi: dict[str, object],
+    *,
+    current_until: str,
+) -> tuple[list[str], list[int], list[int]]:
+    dates: list[str] = []
+    commits: list[int] = []
+    repos: list[int] = []
+    for snap in history:
+        until = snap.get("_until")
+        if not isinstance(until, str) or not until:
+            continue
+        dates.append(until)
+        raw_c = snap.get("kept-commits")
+        raw_r = snap.get("active-repos")
+        commits.append(int(raw_c) if isinstance(raw_c, (int, float)) else 0)
+        repos.append(int(raw_r) if isinstance(raw_r, (int, float)) else 0)
+    dates.append(current_until)
+    raw_c = current_kpi.get("kept-commits")
+    raw_r = current_kpi.get("active-repos")
+    commits.append(int(raw_c) if isinstance(raw_c, (int, float)) else 0)
+    repos.append(int(raw_r) if isinstance(raw_r, (int, float)) else 0)
+    if len(dates) >= 2 and dates[-1] == dates[-2]:
+        dates.pop(-2)
+        commits.pop(-2)
+        repos.pop(-2)
+    if len(dates) > SPARKLINE_WEEKS:
+        dates = dates[-SPARKLINE_WEEKS:]
+        commits = commits[-SPARKLINE_WEEKS:]
+        repos = repos[-SPARKLINE_WEEKS:]
+    return dates, commits, repos
+
+
+def _trend_axis_ticks(values: list[int], *, tick_count: int = 4) -> list[int]:
+    if not values:
+        return [0]
+    peak = max(values)
+    if peak == 0:
+        return [0]
+    step = max(1, (peak + tick_count - 2) // max(tick_count - 1, 1))
+    top = ((peak + step - 1) // step) * step
+    ticks = list(range(0, top + 1, step))
+    if ticks[-1] != top:
+        ticks.append(top)
+    return ticks
+
+
+def _series_polyline_points(
+    values: list[int],
+    *,
+    x0: float,
+    y0: float,
+    width: float,
+    height: float,
+    y_max: float,
+) -> str:
+    if len(values) < 2:
+        return ""
+    points: list[str] = []
+    for i, value in enumerate(values):
+        x = x0 + (i / (len(values) - 1)) * width
+        if y_max <= 0:
+            y = y0 + height
+        else:
+            y = y0 + height - (value / y_max) * height
+        points.append(f"{x:.1f},{y:.1f}")
+    return " ".join(points)
+
+
+def render_trend_chart_svg(
+    dates: list[str],
+    commits: list[int],
+    repos: list[int],
+) -> str:
+    if len(dates) < 2 or not (len(dates) == len(commits) == len(repos)):
+        return ""
+    chart_width = 520
+    chart_height = 172
+    margin_left = 38
+    margin_right = 10
+    margin_top = 20
+    axis_gap = 10
+    x_label_h = 16
+    panel_height = (chart_height - margin_top - axis_gap - x_label_h) / 2
+    plot_width = chart_width - margin_left - margin_right
+
+    fragments: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{chart_width}" height="{chart_height}" '
+        f'viewBox="0 0 {chart_width} {chart_height}" role="img" '
+        f'aria-label="Weekly trend of kept commits and active repositories">',
+        (
+            f'<text x="{margin_left}" y="13" fill="{HTML_COLOR_FLAT}" '
+            f'font-size="11" font-family="system-ui,sans-serif">'
+            f'<tspan fill="{HTML_COLOR_CHART_COMMITS}">●</tspan> commits  '
+            f'<tspan fill="{HTML_COLOR_CHART_REPOS}">●</tspan> active repos</text>'
+        ),
+    ]
+
+    panels = (
+        ("Commits", commits, HTML_COLOR_CHART_COMMITS, margin_top),
+        ("Active repos", repos, HTML_COLOR_CHART_REPOS, margin_top + panel_height + axis_gap),
+    )
+    for panel_idx, (label, values, stroke, panel_y) in enumerate(panels):
+        tick_max = max(_trend_axis_ticks(values))
+        fragments.append(
+            f'<rect x="{margin_left}" y="{panel_y}" width="{plot_width}" height="{panel_height}" '
+            f'fill="#fafbfc" stroke="#eaeef2" stroke-width="1"/>'
+        )
+        fragments.append(
+            f'<text x="{margin_left + 6}" y="{panel_y + 12}" fill="#1f2328" font-size="10" '
+            f'font-weight="600" font-family="system-ui,sans-serif">{html.escape(label)}</text>'
+        )
+        for tick in _trend_axis_ticks(values):
+            if tick_max == 0:
+                ty = panel_y + panel_height
+            else:
+                ty = panel_y + panel_height - (tick / tick_max) * panel_height
+            fragments.append(
+                f'<line x1="{margin_left}" y1="{ty:.1f}" x2="{margin_left + plot_width}" '
+                f'y2="{ty:.1f}" stroke="#eaeef2" stroke-width="1"/>'
+            )
+            fragments.append(
+                f'<text x="{margin_left - 5}" y="{ty + 3:.1f}" text-anchor="end" '
+                f'fill="{HTML_COLOR_FLAT}" font-size="9" font-family="system-ui,sans-serif">'
+                f"{tick}</text>"
+            )
+        polyline = _series_polyline_points(
+            values,
+            x0=margin_left,
+            y0=panel_y,
+            width=plot_width,
+            height=panel_height,
+            y_max=tick_max,
+        )
+        if polyline:
+            fragments.append(
+                f'<polyline fill="none" stroke="{stroke}" stroke-width="2" points="{polyline}"/>'
+            )
+        for i, value in enumerate(values):
+            x = margin_left + (i / (len(values) - 1)) * plot_width
+            if tick_max == 0:
+                y = panel_y + panel_height
+            else:
+                y = panel_y + panel_height - (value / tick_max) * panel_height
+            fragments.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.5" fill="{stroke}"/>')
+        if panel_idx == 1:
+            for i, date_label in enumerate(dates):
+                x = margin_left + (i / (len(dates) - 1)) * plot_width
+                fragments.append(
+                    f'<text x="{x:.1f}" y="{panel_y + panel_height + 13}" text-anchor="middle" '
+                    f'fill="{HTML_COLOR_FLAT}" font-size="9" font-family="system-ui,sans-serif">'
+                    f"{html.escape(format_chart_date_label(date_label))}</text>"
+                )
+
+    fragments.append("</svg>")
+    return "\n".join(fragments)
+
+
 def build_summary_text(
     since_label: str,
     until_label: str,
@@ -1316,21 +1612,25 @@ def _html_summary_table_rows(
     include_noise: bool = True,
 ) -> list[str]:
     header = (
-        "<thead><tr><th align=\"left\">Repo</th><th align=\"right\">Commits</th>"
-        "<th align=\"right\">Tags</th>"
+        f"<thead><tr>"
+        f'<th align="left" {HTML_TH_STYLE}>Repo</th>'
+        f'<th align="right" {HTML_TH_STYLE}>Commits</th>'
+        f'<th align="right" {HTML_TH_STYLE}>Tags</th>'
     )
     if include_noise:
-        header += "<th align=\"right\">Noise</th>"
+        header += f'<th align="right" {HTML_TH_STYLE}>Noise</th>'
     header += "</tr></thead>"
-    rows = ["<table>", header, "<tbody>"]
-    for repo_name, commit_count, tag_count, noise in summary_rows:
+    rows = [f"<table {HTML_TABLE_STYLE}>", header, "<tbody>"]
+    for idx, (repo_name, commit_count, tag_count, noise) in enumerate(summary_rows):
+        zebra = ' style="background:#f6f8fa;"' if idx % 2 else ""
         row = (
-            f"<tr><td>{html.escape(repo_name)}</td>"
-            f"<td align=\"right\">{commit_count}</td>"
-            f"<td align=\"right\">{tag_count}</td>"
+            f"<tr{zebra}>"
+            f"<td {HTML_TD_STYLE}>{html.escape(repo_name)}</td>"
+            f"<td {HTML_TD_RIGHT_STYLE}>{commit_count}</td>"
+            f"<td {HTML_TD_RIGHT_STYLE}>{tag_count}</td>"
         )
         if include_noise:
-            row += f"<td align=\"right\">{html.escape(noise)}</td>"
+            row += f"<td {HTML_TD_RIGHT_STYLE}>{format_noise_value_html(noise)}</td>"
         row += "</tr>"
         rows.append(row)
     rows.extend(["</tbody>", "</table>"])
@@ -1360,7 +1660,7 @@ def build_digest_html(
 
     title = html.escape(digest_title(scope, since_label, until_label, tz_name))
     window = html.escape(f"{since_label} .. {until_label} ({tz_name})")
-    tldr = html.escape(
+    tldr = markdown_inline_to_html(
         build_tldr_sentence(
             scope,
             since_label,
@@ -1371,42 +1671,47 @@ def build_digest_html(
         )
     )
 
-    activity_md = format_activity_line_with_wow(
+    activity_bits = format_activity_line_html(
         summary_rows,
         org_noise_raw,
         trend=trend,
     )
-    activity_bits = markdown_inline_to_html(activity_md)
-    if trend and trend.noise_rule_summary and trend.noise_rule_summary not in activity_md:
-        activity_bits += f"<br><em>Noise rules: {html.escape(trend.noise_rule_summary)}</em>"
 
     body_parts = [
         "<!DOCTYPE html>",
         "<html>",
         "<head><meta charset=\"utf-8\"></head>",
-        "<body style=\"font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.45; color: #1f2328;\">",
-        f"<h1 style=\"font-size: 1.25rem;\">{title}</h1>",
-        f"<p><strong>TL;DR:</strong> {tldr}</p>",
-        f"<p><strong>Window:</strong> {window}<br>",
+        (
+            "<body style=\"font-family: system-ui, -apple-system, Segoe UI, sans-serif; "
+            "line-height: 1.45; color: #1f2328; max-width: 720px;\">"
+        ),
+        f"<h1 style=\"font-size: 1.25rem; margin-bottom: 0.75rem;\">{title}</h1>",
+        (
+            "<p style=\"background:#f6f8fa; border-left:4px solid #0969da; "
+            "padding:10px 12px; border-radius:4px; margin:0 0 12px 0;\">"
+            f"<strong>TL;DR:</strong> {tldr}</p>"
+        ),
+        f"<p style=\"margin:0 0 12px 0;\"><strong>Window:</strong> {window}<br>",
         f"{activity_bits}</p>",
     ]
 
     if trend and trend.history:
-        commit_series = build_sparkline_series(trend.history, trend.current_kpi, "kept-commits")
-        repo_series = build_sparkline_series(trend.history, trend.current_kpi, "active-repos")
-        body_parts.append("<p style=\"font-size: 0.9rem;\">")
-        body_parts.append("<strong>Trend:</strong> ")
-        body_parts.append(
-            f'commits <img alt="commits trend" width="72" height="18" '
-            f'src="{sparkline_svg_data_uri(commit_series)}" /> · '
-            f'repos <img alt="repos trend" width="72" height="18" '
-            f'src="{sparkline_svg_data_uri(repo_series)}" />'
+        dates, commit_series, repo_series = build_trend_datasets(
+            trend.history,
+            trend.current_kpi,
+            current_until=until_label,
         )
-        body_parts.append("</p>")
+        chart = render_trend_chart_svg(dates, commit_series, repo_series)
+        if chart:
+            weeks = len(dates)
+            body_parts.append(
+                f'<h2 style="font-size: 1.05rem; margin:16px 0 8px 0;">Trend ({weeks}w)</h2>'
+            )
+            body_parts.append(chart)
 
     if type_histogram:
-        body_parts.append("<h2 style=\"font-size: 1.05rem;\">Commit types (kept)</h2>")
-        body_parts.append(f"<p>{markdown_inline_to_html(format_type_rollup_line(type_histogram))}</p>")
+        body_parts.append("<h2 style=\"font-size: 1.05rem; margin:16px 0 8px 0;\">Commit types (kept)</h2>")
+        body_parts.append(format_type_rollup_html_table(type_histogram))
 
     body_parts.append("<h2 style=\"font-size: 1.05rem;\">Cross-repo themes</h2>")
 
@@ -1435,12 +1740,15 @@ def build_digest_html(
     if highlight_tags or notable:
         body_parts.append("<h2 style=\"font-size: 1.05rem;\">Highlights</h2>")
         if highlight_tags:
-            body_parts.append("<h3 style=\"font-size: 0.95rem;\">Tags / releases</h3><ul>")
+            body_parts.append(
+                "<h3 style=\"font-size: 0.95rem; color:#0550ae;\">Tags / releases</h3><ul>"
+            )
             for repo_name, tag in highlight_tags:
                 body_parts.append(
-                    f"<li><code>{html.escape(repo_name)}</code> "
-                    f"<code>{html.escape(tag['name'])}</code> → "
-                    f"<code>{html.escape(tag['sha'])}</code> ({html.escape(tag['date'])})</li>"
+                    f"<li>{html_inline_code(repo_name)} "
+                    f"{html_inline_code(tag['name'], variant='tag')} → "
+                    f"{html_inline_code(tag['sha'])} "
+                    f"({html.escape(tag['date'])})</li>"
                 )
             if extra_highlight_tags:
                 body_parts.append(
@@ -1452,8 +1760,8 @@ def build_digest_html(
             for repo_name, commit in notable:
                 subject = html.escape(truncate_subject(commit["message"]))
                 body_parts.append(
-                    f"<li><code>{html.escape(repo_name)}</code> "
-                    f"<code>{html.escape(commit['sha'])}</code> {subject} — "
+                    f"<li>{html_inline_code(repo_name)} "
+                    f"{html_inline_code(commit['sha'])} {subject} — "
                     f"{html.escape(commit['author'])} ({html.escape(commit['date'])})</li>"
                 )
             body_parts.append("</ul>")
