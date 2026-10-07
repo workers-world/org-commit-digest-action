@@ -1698,7 +1698,8 @@ def render_top_repos_bar_chart_svg(
         return ""
 
     label_col = 148
-    count_col = 36
+    has_tags = any(tag_count for _, _, tag_count, _ in rows)
+    count_col = 88 if has_tags else 36
     bar_area = width - label_col - count_col - 16
     row_h = 22
     pad_top = 8
@@ -1709,10 +1710,15 @@ def render_top_repos_bar_chart_svg(
         f'viewBox="0 0 {width} {height}" role="img" '
         f'aria-label="Top repositories by kept commits">',
     ]
-    for idx, (repo_name, commit_count, _tags, _noise) in enumerate(rows):
+    for idx, (repo_name, commit_count, tag_count, _noise) in enumerate(rows):
         y = pad_top + idx * row_h
         label = html.escape(_truncate_chart_label(repo_name, 22))
         bar_w = (commit_count / max_commits) * bar_area if max_commits else 0
+        if tag_count:
+            tag_word = "tag" if tag_count == 1 else "tags"
+            count_label = f"{commit_count} · {tag_count} {tag_word}"
+        else:
+            count_label = str(commit_count)
         fragments.append(
             f'<text x="0" y="{y + 14}" fill="#1f2328" font-size="11" '
             f'font-family="system-ui,sans-serif">{label}</text>'
@@ -1728,7 +1734,8 @@ def render_top_repos_bar_chart_svg(
             )
         fragments.append(
             f'<text x="{width - 4}" y="{y + 14}" text-anchor="end" fill="#656d76" '
-            f'font-size="11" font-family="system-ui,sans-serif">{commit_count}</text>'
+            f'font-size="11" font-family="system-ui,sans-serif">'
+            f"{html.escape(count_label)}</text>"
         )
     fragments.append("</svg>")
     return "\n".join(fragments)
@@ -2020,7 +2027,8 @@ def build_digest_html(
         type_chart = render_commit_type_chart_svg(type_histogram)
         if type_chart:
             body_parts.append(type_chart)
-        body_parts.append(format_type_rollup_html_table(type_histogram))
+        else:
+            body_parts.append(format_type_rollup_html_table(type_histogram))
 
     body_parts.append("<h2 style=\"font-size: 1.05rem;\">Cross-repo themes</h2>")
 
@@ -2033,7 +2041,8 @@ def build_digest_html(
     top_chart = render_top_repos_bar_chart_svg(top_rows)
     if top_chart:
         body_parts.append(top_chart)
-    body_parts.append("\n".join(_html_summary_table_rows(top_rows, include_noise=False)))
+    else:
+        body_parts.append("\n".join(_html_summary_table_rows(top_rows, include_noise=False)))
     if extra_repos:
         body_parts.append(
             f"<p><em>+{extra_repos} more repos ({extra_commits} commits, {extra_tags} tags) — "
