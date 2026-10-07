@@ -7,15 +7,21 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   digest:
     runs-on: ubuntu-latest
+    env:
+      HISTORY_BRANCH: dev_00_01_00
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: dev_00_01_00
+          token: ${{ secrets.GHA_TOKEN || secrets.WORKERS_WORLD_GHA_TOKEN || github.token }}
 
       - name: Generate digest and notify
+        id: digest
         uses: ./
         env:
           GH_TOKEN: ${{ secrets.TOKEN_READ_ORG_COMMIT || secrets.GH_TOKEN || secrets.WORKERS_WORLD_GHA_TOKEN || secrets.GITHUB_TOKEN }}
@@ -25,6 +31,27 @@ jobs:
           org: workers-world
           exclude-file: exclude.txt
           timezone: Asia/Shanghai
+          history-dir: digest-history
           notify: true
           upload-artifact: false
           verbose: false
+
+      - name: Persist digest-history metadata
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GHA_TOKEN || secrets.WORKERS_WORLD_GHA_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::缺少 GHA_TOKEN / WORKERS_WORLD_GHA_TOKEN，跳过 digest-history 回写（下周 WoW 将缺少本周快照）。"
+            exit 0
+          fi
+          if git diff --quiet -- digest-history && git diff --cached --quiet -- digest-history; then
+            echo "digest-history 无变更，跳过提交。"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add digest-history/
+          git commit -m "chore(digest): refresh weekly history metadata [skip ci]"
+          git push origin "HEAD:${HISTORY_BRANCH}"

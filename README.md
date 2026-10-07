@@ -155,8 +155,9 @@ Workflow 跨 run 保留历史：checkout 或下载 artifact 到例如 `digest-hi
 [`.github/workflows/weekly-commit-digest.yml`](.github/workflows/weekly-commit-digest.yml)：
 
 - cron `0 0 * * 1`（周一 08:00 上海）
-- `uses: ./`，`org: workers-world`，`exclude-file: exclude.txt`
-- Secrets：`TOKEN_READ_ORG_COMMIT`（org 读 PAT，注入 `GH_TOKEN`）、`NOTIFY_GHA_TOKEN`
+- `uses: ./`，`org: workers-world`，`exclude-file: exclude.txt`，`history-dir: digest-history`
+- 仓库内 [`digest-history/`](digest-history/) 预置约 96 周 slim `.digest-meta.json`（WoW / sparkline 读历史）；每次周一跑完 digest 后 workflow 将 `digest-history/` 中**新增或更新的 meta** 提交回 `dev_00_01_00`（需 Org Secret `GHA_TOKEN` 或 `WORKERS_WORLD_GHA_TOKEN`），下一周 run checkout 同一目录即可拿到「上一周」KPI。
+- Secrets：`TOKEN_READ_ORG_COMMIT`（org 读 PAT，注入 `GH_TOKEN`）、`NOTIFY_GHA_TOKEN`；history 回写：`GHA_TOKEN` / `WORKERS_WORLD_GHA_TOKEN`
 
 ## 本地调试
 
