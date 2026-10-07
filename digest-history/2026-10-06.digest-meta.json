@@ -1,0 +1,16 @@
+{
+  "scope": "org:workers-world",
+  "window": {
+    "since": "2026-09-28",
+    "until": "2026-10-06"
+  },
+  "timezone": "Asia/Shanghai",
+  "has-activity": true,
+  "active-count": 45,
+  "kpi": {
+    "active_repos": 45,
+    "kept_commits": 252,
+    "tags": 14,
+    "org_noise_ratio": null
+  }
+}
