@@ -1,0 +1,12 @@
+{
+  "digest-file": "/workspace/tests/fixtures/history_batch/weeks/2026-09-21_2026-09-28/digest.md",
+  "digest-html-file": "/workspace/digest-history/weeks/2026-09-21_2026-09-28/digest.html",
+  "digest-csv-file": "/workspace/tests/fixtures/history_batch/weeks/2026-09-21_2026-09-28/digest.csv",
+  "subject": "[workers-world] weekly digest 2026-09-21..2026-09-28",
+  "repo-count": 59,
+  "active-count": 34,
+  "scope": "org:workers-world",
+  "has-activity": true,
+  "window": "2026-09-21..2026-09-28",
+  "timezone": "Asia/Shanghai"
+}

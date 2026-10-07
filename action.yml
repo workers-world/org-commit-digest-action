@@ -49,6 +49,10 @@ inputs:
     description: Output markdown path when there is activity
     required: false
     default: digest.md
+  history-dir:
+    description: Directory of prior weekly `.digest-meta.json` snapshots (for WoW KPIs and sparklines); default is the directory containing `out`
+    required: false
+    default: ''
   verbose:
     description: Write digest to step summary (avoid on public self-run)
     required: false
@@ -103,6 +107,7 @@ runs:
         INPUT_EXCLUDE_FILE: ${{ inputs.exclude-file }}
         INPUT_EXCLUDE: ${{ inputs.exclude }}
         INPUT_OUT: ${{ inputs.out }}
+        INPUT_HISTORY_DIR: ${{ inputs.history-dir }}
         INPUT_VERBOSE: ${{ inputs.verbose }}
         INPUT_INCLUDE_MERGES: ${{ inputs.include-merges }}
         INPUT_NOISE_FILTER: ${{ inputs.noise-filter }}
