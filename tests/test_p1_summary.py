@@ -13,7 +13,10 @@ from digest import (
     build_kpi_snapshot,
     build_layered_summary_md,
     build_sparkline_series,
+    count_kept_rows_from_csv,
+    find_prior_week_kpi,
     format_wow_suffix,
+    kpi_from_meta_record,
     load_kpi_history,
     select_prior_week_kpi,
     sparkline_ascii,
@@ -23,6 +26,8 @@ from digest import (
     write_meta,
     history_meta_path,
 )
+
+FIXTURE_HISTORY = Path(__file__).resolve().parent / "fixtures" / "history_batch"
 
 
 class WowDeltaTests(unittest.TestCase):
@@ -74,6 +79,37 @@ class NoiseRuleSummaryTests(unittest.TestCase):
 
 
 class HistoryHelperTests(unittest.TestCase):
+    def test_thin_meta_infers_kpi_from_csv(self) -> None:
+        meta_path = FIXTURE_HISTORY / "weeks" / "2026-09-28_2026-10-06" / ".digest-meta.json"
+        if not meta_path.parent.joinpath("digest.csv").is_file():
+            self.skipTest("history_batch fixture missing")
+        data = {
+            "scope": "org:workers-world",
+            "window": "2026-09-28..2026-10-06",
+            "has-activity": True,
+            "active-count": 45,
+            "digest-csv-file": str(meta_path.parent / "digest.csv"),
+        }
+        kpi = kpi_from_meta_record(data, meta_path=meta_path)
+        assert kpi is not None
+        commits, tags = count_kept_rows_from_csv(meta_path.parent / "digest.csv")
+        self.assertEqual(kpi["active-repos"], 45)
+        self.assertEqual(kpi["kept-commits"], commits)
+        self.assertEqual(kpi["tags"], tags)
+        self.assertEqual(commits, 252)
+        self.assertEqual(tags, 14)
+
+    def test_batch_week_dirs_and_window_chain_prior(self) -> None:
+        if not FIXTURE_HISTORY.is_dir():
+            self.skipTest("history_batch fixture missing")
+        scope = "org:workers-world"
+        history = load_kpi_history(FIXTURE_HISTORY, scope, exclude_window="2026-09-28..2026-10-06")
+        self.assertGreaterEqual(len(history), 2)
+        prior = find_prior_week_kpi(history, "2026-09-28")
+        self.assertIsNotNone(prior)
+        self.assertEqual(prior.get("_until"), "2026-09-28")
+        self.assertEqual(prior.get("active-repos"), 34)
+
     def test_load_and_select_prior(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             history = Path(tmp)

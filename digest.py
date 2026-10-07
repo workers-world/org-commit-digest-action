@@ -788,6 +788,47 @@ def parse_window_until(window: str) -> str | None:
     return window.split("..", 1)[1].strip()
 
 
+def parse_window_since(window: str) -> str | None:
+    if ".." not in window:
+        return None
+    return window.split("..", 1)[0].strip()
+
+
+def count_kept_rows_from_csv(csv_path: Path) -> tuple[int, int]:
+    commits = 0
+    tags = 0
+    with csv_path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            item_type = (row.get("type") or "").strip()
+            if item_type == "commit":
+                commits += 1
+            elif item_type == "tag":
+                tags += 1
+    return commits, tags
+
+
+def resolve_digest_csv_path(data: dict[str, object], meta_path: Path) -> Path | None:
+    candidates: list[Path] = []
+    raw = data.get("digest-csv-file")
+    if raw:
+        path = Path(str(raw))
+        candidates.extend([path, meta_path.parent / path.name])
+    candidates.append(meta_path.parent / "digest.csv")
+    seen: set[str] = set()
+    for candidate in candidates:
+        try:
+            key = str(candidate.resolve())
+        except OSError:
+            key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def bucket_commit_type(message: str) -> str:
     if _RELEASE_SUBJECT.match(message.strip()):
         return "release"
@@ -864,18 +905,84 @@ def history_meta_path(history_dir: Path, until_label: str) -> Path:
     return history_dir / f"{until_label}.digest-meta.json"
 
 
+def week_dir_meta_path(history_dir: Path, since_label: str, until_label: str) -> Path:
+    return history_dir / "weeks" / f"{since_label}_{until_label}" / META_FILE
+
+
+def iter_history_meta_paths(history_dir: Path) -> list[Path]:
+    """Discover archived meta: flat `{until}.digest-meta.json` and batch `weeks/*/.digest-meta.json`."""
+    if not history_dir.is_dir():
+        return []
+    found: dict[str, Path] = {}
+    patterns = (
+        HISTORY_META_GLOB,
+        f"weeks/*/{META_FILE}",
+        f"weeks/*/*{META_FILE}",
+        f"**/{META_FILE}",
+    )
+    for pattern in patterns:
+        for path in history_dir.glob(pattern):
+            if not path.is_file():
+                continue
+            if path.name == META_FILE and path.parent.resolve() == history_dir.resolve():
+                continue
+            found[str(path.resolve())] = path
+    return sorted(found.values(), key=lambda item: str(item))
+
+
+def kpi_from_meta_record(data: dict[str, object], *, meta_path: Path) -> dict[str, object] | None:
+    scope = str(data.get("scope") or "")
+    window = str(data.get("window") or "")
+    if not scope or not window:
+        return None
+    until = parse_window_until(window)
+    if not until:
+        return None
+
+    embedded = data.get("kpi")
+    if isinstance(embedded, dict) and embedded.get("active-repos") is not None:
+        merged: dict[str, object] = dict(embedded)
+    else:
+        has_activity = bool(data.get("has-activity"))
+        active = int(data.get("active-count") or 0)
+        kept_commits = 0
+        tags = 0
+        if has_activity:
+            csv_path = resolve_digest_csv_path(data, meta_path)
+            if csv_path is not None:
+                kept_commits, tags = count_kept_rows_from_csv(csv_path)
+        noise_pct: float | None = None
+        if isinstance(embedded, dict) and embedded.get("noise-pct") is not None:
+            raw_noise = embedded.get("noise-pct")
+            if isinstance(raw_noise, (int, float)):
+                noise_pct = float(raw_noise)
+            elif isinstance(raw_noise, str):
+                noise_pct = parse_noise_pct(raw_noise)
+        merged = {
+            "scope": scope,
+            "window": window,
+            "active-repos": active,
+            "kept-commits": kept_commits,
+            "tags": tags,
+            "noise-pct": noise_pct,
+        }
+
+    merged["window"] = window
+    merged["scope"] = scope
+    merged["_until"] = until
+    merged["_since"] = parse_window_since(window)
+    return merged
+
+
 def load_kpi_history(
     history_dir: Path,
     scope: str,
     *,
     exclude_window: str | None = None,
 ) -> list[dict[str, object]]:
-    if not history_dir.is_dir():
-        return []
     snapshots: list[dict[str, object]] = []
-    for path in sorted(history_dir.glob(HISTORY_META_GLOB)):
-        if path.name == META_FILE:
-            continue
+    seen_windows: set[str] = set()
+    for path in iter_history_meta_paths(history_dir):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -884,27 +991,48 @@ def load_kpi_history(
             continue
         if data.get("scope") != scope:
             continue
-        kpi = data.get("kpi")
-        if not isinstance(kpi, dict):
+        merged = kpi_from_meta_record(data, meta_path=path)
+        if merged is None:
             continue
-        window = str(data.get("window") or kpi.get("window") or "")
+        window = str(merged.get("window") or "")
         if exclude_window and window == exclude_window:
             continue
-        until = parse_window_until(window)
-        if not until:
+        if window in seen_windows:
             continue
-        merged = dict(kpi)
-        merged["window"] = window
-        merged["_until"] = until
+        seen_windows.add(window)
         snapshots.append(merged)
     snapshots.sort(key=lambda item: str(item.get("_until", "")))
     return snapshots
+
+
+def find_prior_week_kpi(
+    history: list[dict[str, object]],
+    since_label: str,
+) -> dict[str, object] | None:
+    """Prior Mon–Mon window: snapshot whose window ends on this run's ``since`` date."""
+    for snap in history:
+        if str(snap.get("_until")) == since_label:
+            return snap
+    return None
 
 
 def select_prior_week_kpi(history: list[dict[str, object]]) -> dict[str, object] | None:
     if not history:
         return None
     return history[-1]
+
+
+def persist_history_meta(
+    history_dir: Path,
+    since_label: str,
+    until_label: str,
+    payload: dict[str, object],
+) -> None:
+    history_dir.mkdir(parents=True, exist_ok=True)
+    write_meta(history_meta_path(history_dir, until_label), payload)
+    week_path = week_dir_meta_path(history_dir, since_label, until_label)
+    week_path.parent.mkdir(parents=True, exist_ok=True)
+    write_meta(week_path, payload)
 
 
 def wow_delta_pct(current: float | int, previous: float | int | None) -> float | None:
@@ -1485,25 +1613,35 @@ def main() -> int:
 
     history_dir_input = os.environ.get("INPUT_HISTORY_DIR", "")
     meta_path = Path(META_FILE)
+    history_dir = resolve_history_dir(out_file, history_dir_input)
+    window_label = f"{since_label}..{until_label}"
     if not had_raw_activity:
         message = f"no activity in window {since_label}..{until_label} {tz_name} ({scanned} repos scanned)"
         print(message)
-        write_meta(
-            meta_path,
-            {
-                "digest-file": "",
-                "subject": "",
-                "repo-count": scanned,
-                "active-count": 0,
-                "scope": scope,
-                "has-activity": False,
-                "window": f"{since_label}..{until_label}",
-                "timezone": tz_name,
-            },
-        )
+        empty_kpi: dict[str, object] = {
+            "scope": scope,
+            "window": window_label,
+            "active-repos": 0,
+            "kept-commits": 0,
+            "tags": 0,
+            "noise-pct": None,
+        }
+        meta_payload = {
+            "digest-file": "",
+            "subject": "",
+            "repo-count": scanned,
+            "active-count": 0,
+            "scope": scope,
+            "has-activity": False,
+            "window": window_label,
+            "timezone": tz_name,
+            "kpi": empty_kpi,
+            "history-dir": str(history_dir),
+        }
+        write_meta(meta_path, meta_payload)
+        persist_history_meta(history_dir, since_label, until_label, meta_payload)
         return 0
 
-    window_label = f"{since_label}..{until_label}"
     summary_rows = build_summary_rows(sections, per_repo_counts=per_repo_counts)
     org_noise = org_wide_noise_ratio(per_repo_counts) if per_repo_counts else None
     current_kpi = build_kpi_snapshot(
@@ -1512,9 +1650,8 @@ def main() -> int:
         window=window_label,
         org_noise_ratio=org_noise,
     )
-    history_dir = resolve_history_dir(out_file, history_dir_input)
     kpi_history = load_kpi_history(history_dir, scope, exclude_window=window_label)
-    prior_kpi = select_prior_week_kpi(kpi_history)
+    prior_kpi = find_prior_week_kpi(kpi_history, since_label)
     noise_rule_summary = summarize_noise_rules(ignored_counts) or None
     trend = SummaryTrendContext(
         prior_kpi=prior_kpi,
@@ -1563,7 +1700,7 @@ def main() -> int:
         "history-dir": str(history_dir),
     }
     write_meta(meta_path, meta_payload)
-    write_meta(history_meta_path(history_dir, until_label), meta_payload)
+    persist_history_meta(history_dir, since_label, until_label, meta_payload)
     maybe_write_summary(digest_text, verbose)
     print(f"digest written: {out_file} ({active} active / {scanned} scanned)")
     return 0

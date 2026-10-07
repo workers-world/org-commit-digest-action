@@ -1,0 +1,267 @@
+window_since,window_until,timezone,repo,type,sha,name,author,date
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,acbfaa8,fix(gha): WW-124 self-hosted runner classification and October billing backfill (#85),ZEROWORLD,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,0537135,fix(WW-116): parallelize hourly cron with run concurrency 3,ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,983cdad,fix: add legacy-peer-deps to .npmrc to fix npm install edgesOut crash (#81),ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,88d8acb,feat(planning): Agent 规划 API 接受 KEY1 scoped key,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,4121c43,feat(planning): Agent API /v1/agent/planning/*（confirm 闸 + WorkerIo）(#79)(WW-112)(PGREQ20261003000003),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,870ec78,fix(pipeline): SDK Packages 阶段 workflow_run 匹配 master (WW-56),ongoing-z,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,7b4c427,fix(ci): harden planning-release.yml for zizmor medium+ (#72),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,a6ae0c9,chore(scaffold): 新建 Worker 默认开启 observability.issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,44e2578,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,df67692,chore(scaffold): wrangler 模板注释 CF Workers Issues 配置 (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,3a03018,feat(pipeline-registry): 自动发现未配置 Worker 并支持一键批量生成,ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,3cfbae2,fix(status-query): 新 attempt 不再误绑历史 CF 成功,ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,0a20820,chore(scaffold): 新建 Worker 默认开启 observability.issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,0a58f6c,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,ed4ffee,chore(scaffold): wrangler 模板注释 CF Workers Issues 配置 (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,03db2f2,feat(pipeline-registry): 自动发现未配置 Worker 并支持一键批量生成,ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,4d41f1e,fix(status-query): 新 attempt 不再误绑历史 CF 成功,ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,694118a,ci: map worker-ci secrets explicitly (zizmor secrets-inherit).,Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,1e67e2f,feat(planning): 需求详情编辑支持改标题与描述。,ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,c81641b,fix(test): use URL hostname/pathname in fetchLatestSdkVersion mocks (#66) (#67),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,7490907,fix(test): use URL hostname/pathname in fetchLatestSdkVersion mocks (#66),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,55d0578,feat(gha): runner type breakdown in Actions usage emails (WW-29),Cursor Agent,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,2591ded,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,dc7243e,规划需求列表 toolbar 增加刷新按钮。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,19075f2,sch1: attach intake evidence for #60 (paste-1790564070788-1.png),deploy-tracker-planning[bot],2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,deploy-tracker-worker,commit,1487beb,sch1: attach intake evidence for #58 (paste-1790562997217-1.png),deploy-tracker-planning[bot],2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,880c6c2,chore: 启用 Smart Placement，便于 fetch 靠近后端,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,ca31bee,fix(admin): 切回任务列表 Tab 时自动刷新，避免需手点刷新,ongoing-z,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,e66a2cf,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,43b8f31,feat(observability): 开启 Cloudflare Workers Issues（sch1 试点）(WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,566f964,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,9150b32,feat(pr-review): 可插拔审查方二选一，首发 Greptile (#40)(WW-17),ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,088e5b1,fix(admin): satisfy Biome lint/format for WW-28 admin files (#60),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,8f79107,feat(admin): allow rerunning completed tasks (WW-28),Cursor Agent,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,50ae128,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,fbfdd38,refactor(workflow): 改用 exports + ctx.exports.SchTaskWorkflow，去掉 env binding (WW-25),ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,45213a8,feat(intake): Tail 消费 CF Agents diagnostics 按 traceId 入库 (WW-23),ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,6d8b10e,chore(deps): framework_sdk_ui 升至 0.1.16（MPG skipped 灰圆减号）。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,899b884,fix(admin): SchStepResult skipped 映射为 MPG skipped，勿显示绿勾。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,ab22433,fix(ci): verify PR CI via Checks API when commit statuses are forbidden (#46),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,6afac8e,fix(ci): pin worker-actions v0.2.1 to commit SHA (not tag object) (#44),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,3c026df,fix(ci): pass workflow-lint (zizmor) for sch1 GitHub Actions (#43),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,72e1469,fix: Preview health 校验改用 optional chain，消除 Biome 警告。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,9265bc2,WW-14：收窄 sch1 smoke 误判,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,abcc1a6,fix: 收窄 Preview health 解析结果，消除 Qodana 空值告警。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch1,commit,7bd9514,WW-19: 任务详情执行日志改用 SDK ShareMenu 复制/下载。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,bd987a8,feat(digest-media): 视频 extractor 默认关，stage rclone href (#57)(WW-47),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,df54b8c,feat(digest-media): 邮件 HTML img 经 dld1 fetch 写入 digest-attach,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,004387e,docs: 指向根仓 digest-media-downloader（dld1）架构,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,e479367,refactor: Browser 抓取改走 BOR1 SDK，去掉本仓 [browser],ongoing-z,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,fde9507,feat(digest-media): HN 讨论页 hnUrl 生成讨论 PDF 附件 (#57)(WW-47),ongoing-z,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,67f64aa,fix: 裁剪超限 LLM pending 载荷避免 Queue 10204,Cursor Agent,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,eb9f99e,fix: V2EX 抽取不再误吃长 h1，nanoping 基准页避开 thin_snippet,Cursor Agent,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,42366c9,sch1: attach intake evidence for #62 (quality-logs-2026-10-02-part1.zip),sch1-agent-pool[bot],2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,af24537,sch1: attach intake evidence for #62 (quality-captures-2026-10-02.csv),sch1-agent-pool[bot],2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,2142d6d,feat(digest-media): 通用附件管线 + HN 评论 PDF MVP (#57)(WW-47),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,5c20123,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,ec01033,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,6252b86,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,e929572,fix: 短 og 不再挡住交互页正文，echohive/OpenAI 避开 thin_snippet (#51),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,email-rule-worker,commit,009afca,fix: 短 og 不再挡住交互页正文，echohive/OpenAI 避开 thin_snippet,Cursor Agent,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,03f88d4,chore: 启用 Smart Placement，便于 fetch 靠近后端,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,fd846eb,fix(ci): gate GHA_RUNNER on private repo in golden-verify (#40),ZEROWORLD,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,1351703,feat: 经 SVC_BROWSER_RUN 绑定 BOR1，并加 golden/探针案例,ongoing-z,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,009edf6,feat(mok1): deploy:remote/preview:remote 门户脚本对接 SDK 0.4.30 (#31)(WW-31),ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,34a77f7,fix(ci): zizmor workflow-lint for planning-release and reusable callers (#35),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,8272885,docs(mok1): 补充 cf 迁移通用步骤与文件职责说明 (#31)(WW-31),ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,dc06744,feat(mok1): Wrangler → cf 试点迁移（cloudflare.config.ts + scripts） (#31)(WW-31),ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,32bfb77,chore(deps): bump wrangler 至 4.144.0 以满足 cf migrate (#31)(WW-31),ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,e6fb7d5,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,0de2b99,sch1: attach intake evidence for #30 (paste-1790562714540-1.png),deploy-tracker-planning[bot],2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,mok1,commit,3761817,添加preview配置。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,0478132,style: single-line import in fund-resolve.test.ts for Biome,Cursor Agent,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,e4e05db,fix(WW-115): lengthen fund-info reverse/funds caller timeout to 330s,ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,583b3d0,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,f1a71a6,fix: suppress draft quality noise for resolved overseas indices,ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,843d51d,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,a8110d5,fix: 收敛 desk.draft_quality ×110 韩国指数/大宗 fund-info 空候选 intake,Cursor Agent,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,c13af29,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,646649d,fix: 挡住黄金草稿 rationale 张冠李戴与标题噪声关键词 (#55),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,80e085f,fix: 堵住 desk.draft_quality ×13 空候选洪峰（前缀 A 股 / ST 名 / 窄主题缺口） (#53),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,decision-desk-worker,commit,2e81009,fix: 堵住 desk.draft_quality ×13 空候选洪峰（前缀 A 股 / ST 名 / 窄主题缺口）,Cursor Agent,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,f28ee06,fix(browser_run): wrangler 显式 crons=[] 清除 BOR1 退役后的孤儿 Cron,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,863df0c,chore: 抬高 hono/vitest 下限以避开已知 CVE,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,cd4d64b,test(browser_run): 补 BOR1 网关 slot/quickAction/HTTP 单测 (#17)(WW-111),ongoing-z,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,01db4ee,feat: 改造为账号级 Browser Quick Action 网关（BOR1）,ongoing-z,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,a89a137,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,cdb88ac,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,f5aaccc,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,3b45bb5,fix: ensureSchema 先探测列再 ALTER，避免 duplicate column 观测噪声。 (#8),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,browser_run,commit,2865736,fix: ensureSchema 先探测列再 ALTER，避免 duplicate column 观测噪声。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,aa33d22,release: dev_00_27_00 → master (#92),ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,8cb48eb,feat(browser): 新增 BOR1 Service Binding 薄客户端 runBrowserAction (#91),ZEROWORLD,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,58b9d26,feat(ci): 新发 Packages 后自动打 v{semver} tag 并衔接 golden-verify (WW-56),ongoing-z,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,b5b1228,fix(qodana): 消除 NodeJS.ProcessEnv JSDoc 与 cf-agents 长路径 import,ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,3f569a7,feat(attachment): 抽出 Content/Reference 祖先并挂 DigestItem (#57)(WW-47),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,8f4941a,feat(cli): 新增 workers-deploy/preview-worker 门户 bin (#31)(WW-31),ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,73447f1,fix(ci): use GitHub-hosted runners on public repository (#86),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,commit,91d2a47,feat(intake): CF Agents diagnostics 故事级归并 API (WW-23),ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,tag,aa33d22,v0.4.33,,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_worker,tag,8cb48eb,v0.4.32,,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,f5ec9ba,fix(qodana): 抬高 hono/vitest 安全下限，并去掉 cron 本地 rethrow 与 deprecated telemetry,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,4ba0d8c,feat(daily): 日报分阶段轨迹、LLM 超时对齐与 Workflow 主路径,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,99f5ef6,fix: 共享实例不再发出无 story 的 Agent diagnostics (#34),ZEROWORLD,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,a15877c,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,fb5b618,fix: 停止问答路径 setState，避免孤立 Agent diagnostics,ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,d7df03d,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,e966234,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,market-qa-agent,commit,7280651,chore(wrangler): 增加 tail_consumers → sch1（WW-23 diagnostics）,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,commit,6fff10a,0.2.0 (#8),ZEROWORLD,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,commit,9114789,0.1.0 (#2),ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,commit,d1c5c65,fix(deps): vitest 升至 ^4.1.11，修复 CVE-2026-84373,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,commit,fc25296,public仓库直接使用ubuntu-latest即可。,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,commit,fcb8992,refactor(cli): src 按子包目录拆分（envelope/argv/http/portal/search）(#79)(WW-112),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,commit,98e820c,ci: 对齐 SDK 仓 CI/Publish/Release（sync-lock → verify → Packages）(#79)(WW-112),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,commit,bd6b586,feat(cli): Agent CLI 基建库（进程信封、runPortal、confirm、WorkerIo 映射、search）(#79)(WW-112)(PGREQ20261003000003),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,tag,6fff10a,v0.2.0,,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_cli,tag,9114789,v0.1.0,,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,fund-info-worker,commit,eb1678b,feat(WW-115): log reverse/funds cache hit rate without enabling TTL,ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,fund-info-worker,commit,2834227,fix(WW-114): fund-info container alarm returns immediately while running,ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,fund-info-worker,commit,9d854e1,fix: 吞掉 Container alarm/storage 的 Durable Object reset 噪声 (#26),ZEROWORLD,2026-10-02
+2026-09-28,2026-10-06,Asia/Shanghai,fund-info-worker,commit,ee74d52,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,fund-info-worker,commit,d62082d,fix(ci): move GHCR login credentials from run to env (zizmor template-injection),Cursor Agent,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,fund-info-worker,commit,4572704,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,fund-info-worker,commit,1033b7e,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,advisor-worker,commit,28c3b11,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,advisor-worker,commit,571f1e7,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,advisor-worker,commit,47d4f17,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,advisor-worker,commit,afb58d3,fix: 回收 403 毒化 failed 行，鉴权恢复后自动再分析,Cursor Agent,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,advisor-worker,commit,642bee4,sch1: attach intake evidence for #40 (quality-logs-2026-09-28-part1.zip),sch1-agent-pool[bot],2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,advisor-worker,commit,2985743,sch1: attach intake evidence for #40 (quality-captures-2026-09-28.csv),sch1-agent-pool[bot],2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,edge-gateway-worker,commit,c37ddb2,chore(routes): 同步 key1 /device 白名单 (WW-129),ongoing-z,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,edge-gateway-worker,commit,cd84078,chore: 同步 key1 独立域名路由进 gateway 清单,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,edge-gateway-worker,commit,c37c1a4,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,edge-gateway-worker,commit,e9356ec,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,edge-gateway-worker,commit,e3e6ded,release: dev_00_03_00 → master (#2),ZEROWORLD,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,edge-gateway-worker,commit,42cec12,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,invest-rss-worker,commit,4a9428d,fix: add legacy-peer-deps to .npmrc to avoid npm arborist edgesOut crash (#40),ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,invest-rss-worker,commit,3040257,fix(deps): 抬高 hono/vitest 下限以消除 Qodana CVE,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,invest-rss-worker,commit,2c33af5,refactor: Browser 正文抓取改走 BOR1 SDK，去掉本仓 [browser],ongoing-z,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,invest-rss-worker,commit,e57160f,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,invest-rss-worker,commit,27265d3,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,invest-rss-worker,commit,dd8b3e9,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,orchestrator-worker,commit,fa10e80,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,orchestrator-worker,commit,d454a90,fix(workflows): QualityAuditPipelineWorkflow ctx.exports 回退 env binding (#35),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,orchestrator-worker,commit,1d507cf,fix(release): resolve master conflicts + workers-types for wrangler 4.142 (#33),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,orchestrator-worker,commit,6100e5b,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,orchestrator-worker,commit,828c5f7,fix(quality-cluster): 去掉 triggerQualityAudit 未使用的 env 参数 (WW-25),ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,orchestrator-worker,commit,07006c2,feat(workflows): 同脚本 Workflow 改 exports + ctx.exports，仅保留 TASK_PIPELINE env binding (WW-25),ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,sch2,commit,ee33349,chore: 启用 Smart Placement，便于 fetch 靠近后端,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,sch2,commit,277085a,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,sch2,commit,f95b305,fix(ci): harden planning-release.yml for zizmor (#8),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,sch2,commit,02f5192,release: dev_00_01_00 → master (#3),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,sch2,commit,c6d13cf,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,sch2,commit,338b41e,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,worker-support-action,commit,43f3bed,"fix: notify body, PR counters, and archived repo skip (WW-49) (#11)",ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,worker-support-action,commit,cc6de78,"fix: GHA_TOKEN auth, lockfile/npm packages, and workdir cleanup for bump-cloudflare-deps (WW-49) (#9)",ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,worker-support-action,commit,93973a9,feat(WW-49): Cloudflare npm dependency auto-upgrade workflow (#7),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,worker-support-action,commit,e23e967,fix(ci): preflight promote before worker-promote v0.2.9 (#3),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,worker-support-action,commit,c1709e1,fix(bump-compat-date): use body instead of unsupported body-file for success notify (#2),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,worker-support-action,commit,e33b6a9,"fix: bump-compat-date remote auth, git identity, and trap leak (#1)",ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,ww,commit,30382ab,docs: 补充 ww 首次安装步骤（workspace + Packages）,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,ww,commit,87f90b5,fix(ww): 清除未用常量并升级 vitest 修复 CVE-2026-84373,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,ww,commit,3fcdc8c,docs: 支持仓根 .env（gitignore）并附 .env.example,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,ww,commit,5c7a333,docs: DEPLOY_TRACKER_BASE 改为必填，不再写死生产 host,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,ww,commit,1424f2e,ci: 门户 CI/Publish + registry 依赖 framework_sdk_cli (#79)(WW-112),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,ww,commit,b4641b5,feat(ww): Agent 业务门户 + pgreq（闸 A 薄客户端）(#79)(WW-112)(PGREQ20261003000003),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,commit,fbcb2eb,release: dev_00_02_00 → master (#56),ZEROWORLD,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,commit,8132e22,fix(ci): gate GHA_RUNNER on private repos; align nested pins to v0.2.10 (#51) (#53),ZEROWORLD,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,commit,41ba6e4,Release: align nested pins to actions/v0.2.8 (v0.2.9) (#49),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,commit,994d74d,Release: restore workflow_call.secrets (v0.2.8) (#45),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,commit,94bbd58,ci: create release PRs ready by default (create_draft_release_pr=false),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,0b78019,actions/v0.2.12,,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,fbcb2eb,actions/v0.2.11,,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,8132e22,actions/v0.2.10,,2026-10-03
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,41ba6e4,actions/v0.2.9,,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,994d74d,actions/v0.2.8,,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,fd66f97,actions/v0.2.7,,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,d3f4f5d,actions/v0.2.6,,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,a2c59ac,actions/v0.2.5,,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,4d16ed7,actions/v0.2.4,,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,worker-actions,tag,df521d0,actions/v0.2.3,,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,analysis-engine-worker,commit,e85caf7,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,analysis-engine-worker,commit,7f78d65,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,analysis-engine-worker,commit,6a24f33,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,analysis-engine-worker,commit,ddd99ff,fix: 清洗 thesis_no_evidence 与 trading_terms，避免 merge 硬拒丢证据 (#14),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,analysis-engine-worker,commit,e51e58e,fix: 清洗 thesis_no_evidence 与 trading_terms，避免 merge 硬拒丢证据,Cursor Agent,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,key1,commit,45d662b,feat(device): RFC 8628 设备码登录与 Access 确认页 (WW-129),ongoing-z,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,key1,commit,1291330,fix(ci): map reusable workflow secrets explicitly for zizmor,Cursor Agent,2026-10-05
+2026-09-28,2026-10-06,Asia/Shanghai,key1,commit,8ba2dac,chore: 启用 Smart Placement，便于 fetch 靠近后端,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,key1,commit,72e99d9,fix(key1): 将 vitest 升到 4.1.11 以修复 CVE-2026-84373,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,key1,commit,8c150cd,feat: 脚手架 KEY1 Worker（签发 hashed scoped bot API Key）,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,notify-worker,commit,01bf259,feat(digest): 正文原样打印 href-only 引用，水合仍跳过无 r2Key (#57)(WW-47),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,notify-worker,commit,4dc21da,feat(digest): 水合 attachmentReferences 发信并删暂存 (#57)(WW-47),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,notify-worker,commit,c080ecd,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,notify-worker,commit,e9de959,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,notify-worker,commit,c3a7c32,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,audit-log-worker,commit,71a8b17,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,audit-log-worker,commit,c23b93d,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,audit-log-worker,commit,defbf60,release: dev_00_04_00 → master (#8),ZEROWORLD,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,audit-log-worker,commit,b3b996d,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,config-agent,commit,38b5d79,release: dev_00_03_00 → master (#2),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,config-agent,commit,a6e2466,fix(ci): 显式映射 reusable workflow secrets，移除 secrets: inherit,Cursor Agent,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,config-agent,commit,aa81ed3,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,config-agent,commit,e232d06,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,counter-worker,commit,309cf88,fix(ci): harden planning-release workflow for zizmor (#21),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,counter-worker,commit,38ad8aa,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,counter-worker,commit,e9a325c,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,counter-worker,commit,38f0bca,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,gold-price-worker,commit,99cf4ea,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,gold-price-worker,commit,ced9977,ci: map worker-ci secrets explicitly (zizmor secrets-inherit).,Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,gold-price-worker,commit,d83b985,release: dev_00_16_00 → master (#10),ZEROWORLD,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,gold-price-worker,commit,fa1cd7b,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,lib-newbook-worker,commit,3d50975,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,lib-newbook-worker,commit,2b6eb7b,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,lib-newbook-worker,commit,36ffa1a,release: dev_00_07_00 → master (#6),ZEROWORLD,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,lib-newbook-worker,commit,1ddd8ef,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,llm-gateway-worker,commit,79e1009,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,llm-gateway-worker,commit,6a74ae3,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,llm-gateway-worker,commit,fa020f0,release: dev_00_22_00 → master (#13),ZEROWORLD,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,llm-gateway-worker,commit,414968b,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,mcp-registry-worker,commit,b765247,feat(registry): deploy-tracker 登记 /v1/agent/planning（须 confirm）(#79)(WW-112)(PGREQ20261003000003),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,mcp-registry-worker,commit,1c95c1c,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,mcp-registry-worker,commit,9d133e2,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,mcp-registry-worker,commit,46e0b29,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,r2-image-transform-worker,commit,45aaf47,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,r2-image-transform-worker,commit,0bfbfd0,ci: zizmor ignore excessive-permissions on manual deploy.yml,dev-bot,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,r2-image-transform-worker,commit,8fc394d,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,r2-image-transform-worker,commit,2949c6d,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,r2-viewer-worker,commit,b76e38a,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,r2-viewer-worker,commit,8cbf690,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,r2-viewer-worker,commit,409e508,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,r2-viewer-worker,commit,f3e9796,release: dev_00_01_00 → master (#1),ZEROWORLD,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,tal1,commit,3752117,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,tal1,commit,0b34ca1,release: dev_00_02_00 → master (#5),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,tal1,commit,1b0b1b7,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,tal1,commit,495c81e,feat(tal1): 未捕获异常汇聚 Logs + sch1 Intake，并开启 source maps (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,bok1,commit,836ed33,chore: 启用 Smart Placement，便于 fetch 靠近后端,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,bok1,commit,1e223c8,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,bok1,commit,777bc59,chore: 入库 bok1 Worker 源码与配置。,ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,cpt1,commit,c339658,fix(ci): explicit workflow secrets and deploy-container zizmor hardening,Cursor Agent,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,cpt1,commit,ca0f366,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,cpt1,commit,d6c03df,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,fund-monitor-worker,commit,512bace,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,fund-monitor-worker,commit,8c08aef,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,fund-monitor-worker,commit,435d6d5,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,fund-price-worker,commit,e1f32c9,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,fund-price-worker,commit,c07bdb1,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,fund-price-worker,commit,8a556fd,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,my-blog-subscribe-worker,commit,4c3f68c,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,my-blog-subscribe-worker,commit,c51a3e9,ci: map worker-ci secrets explicitly (zizmor secrets-inherit),Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,my-blog-subscribe-worker,commit,4b7dd0b,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,strategy-monitor,commit,245a6ce,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,strategy-monitor,commit,47a21c0,ci: map worker-ci secrets explicitly (zizmor secrets-inherit). See uploads/README.md.,Cursor Agent,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,strategy-monitor,commit,ad6b767,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,dld1,commit,7346576,feat(dld1): 视频 Container yt-dlp 写 digest-media 并返回 rclone href (#57)(WW-47),ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,dld1,commit,426ef4b,feat(dld1): 图 fetch/harvest 写 R2（下载访问层脚手架）,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,manim-playground-worker,commit,78555e1,feat(observability): 开启 Cloudflare Workers Issues (WW-45),ongoing-z,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,manim-playground-worker,commit,1cdc675,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,market-data-mcp,commit,d32d579,release: dev_00_03_00 → master (#10),ZEROWORLD,2026-10-01
+2026-09-28,2026-10-06,Asia/Shanghai,market-data-mcp,commit,19f69c9,release: dev_00_02_00 → master (#5),ZEROWORLD,2026-09-29
+2026-09-28,2026-10-06,Asia/Shanghai,agent-release-kit,commit,f59f579,refactor: .env.release-local 改用 Node 原生 loadEnvFile,ongoing-z,2026-10-04
+2026-09-28,2026-10-06,Asia/Shanghai,dbb1,commit,85b7e73,chore: 初始化 dbb1 数据库备份调度仓。,ongoing-z,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,framework_sdk_ui,commit,8574dbe,feat(mpg): skipped 结点用 GitHub Actions 灰圆减号图标。,ongoing-z,2026-09-28
+2026-09-28,2026-10-06,Asia/Shanghai,install_fund_name,commit,c5df653,fix(ci): zizmor build-image env login and explicit workflow secrets (#5),ZEROWORLD,2026-09-30
+2026-09-28,2026-10-06,Asia/Shanghai,por1,commit,7284daf,chore(wrangler): 启用 upload_source_maps 以便未捕获异常 remap (WW-26),ongoing-z,2026-09-29

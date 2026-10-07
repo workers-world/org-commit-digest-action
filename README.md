@@ -109,12 +109,20 @@ R4/R8/R10 会调用 GitHub **commit files** API（与 digest 相同 `GH_TOKEN`�
 
 ### 周环比与 history-dir
 
-每次有活动时会：
+每次 run（含**空窗**）会：
 
-1. 在 action 根目录写 `.digest-meta.json`（含 `kpi`：`active-repos`、`kept-commits`、`tags`、`noise-pct`）。
-2. 在 **`history-dir`**（默认与 `out` 同目录）追加 **`{until}.digest-meta.json`**（例如 `2026-10-06.digest-meta.json`），供下次 run 读取。
+1. 在 action 根目录写 `.digest-meta.json`（含 **`kpi`**：`active-repos`、`kept-commits`、`tags`、`noise-pct`）。
+2. 在 **`history-dir`** 写入两份归档（便于 flat 与 batch 布局共存）：
+   - **`{until}.digest-meta.json`**（例如 `2026-10-06.digest-meta.json`）
+   - **`weeks/{since}_{until}/.digest-meta.json`**（与历史重建 batch 一致，见 `INDEX.md`）
 
-下次扫描时会在 `history-dir` 下 glob `*.digest-meta.json`（跳过根目录 `.digest-meta.json`），按 `window` 结束日排序，取**最近一周且 `scope` 相同**的快照与当前 KPI 做 WoW。Workflow 若需跨 run 保留历史，可在 job 开头 checkout/下载 artifact 到固定目录并设置 `history-dir: digest-history`（与 `out` 路径独立亦可）。
+**发现历史**：在 `history-dir` 下递归查找 `*.digest-meta.json` 与 `weeks/*/.digest-meta.json`（跳过 `history-dir` 根上的 scratch `.digest-meta.json`）。同 `scope`、同 `window` 去重后按结束日排序。
+
+**WoW 对齐**：与 Mon–Mon 链一致——取 **`window` 结束日 == 本次 `since`** 的快照作为「上周」（不是简单取最新文件）。例如本次 `2026-09-28..2026-10-06` 对比 `2026-09-21..2026-09-28`。
+
+**薄 meta 回填**：旧归档仅有 `active-count` / `digest-csv-file` 时，从同目录 **`digest.csv`** 统计 kept commits/tags（与 CSV 附件一致）；空窗周 `active-repos=0` 仍进入 sparkline 序列。
+
+Workflow 跨 run 保留历史：checkout 或下载 artifact 到例如 `digest-history/`，设置 `history-dir: digest-history`（`out` 仍可写当前周 `digest.md`）。
 
 ## 空窗行为
 
