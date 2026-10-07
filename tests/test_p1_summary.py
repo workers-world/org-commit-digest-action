@@ -20,6 +20,9 @@ from digest import (
     format_wow_suffix,
     kpi_from_meta_record,
     load_kpi_history,
+    render_commit_type_chart_svg,
+    render_kpi_card_strip_html,
+    render_top_repos_bar_chart_svg,
     render_trend_chart_svg,
     select_prior_week_kpi,
     sparkline_ascii,
@@ -250,6 +253,46 @@ class LayeredSummaryP1Tests(unittest.TestCase):
         down = format_wow_suffix_html(-5.0)
         self.assertIn("#1a7f37", up)
         self.assertIn("#cf222e", down)
+
+    def test_html_kpi_card_strip_and_charts(self) -> None:
+        sections = self._sections()
+        summary_rows = [("alpha", 14, 1, "10.0%")]
+        trend = SummaryTrendContext(
+            prior_kpi={"active-repos": 45, "kept-commits": 252, "tags": 14, "noise-pct": 25.0},
+            history=[],
+            current_kpi={"active-repos": 10, "kept-commits": 30, "tags": 4, "noise-pct": 19.0},
+        )
+        kpi_html = render_kpi_card_strip_html(
+            summary_rows, "19.0%", trend=trend
+        )
+        self.assertIn("Active repos", kpi_html)
+        self.assertIn("Kept commits", kpi_html)
+        self.assertIn("Noise %", kpi_html)
+        self.assertIn("#cf222e", kpi_html)
+
+        bar = render_top_repos_bar_chart_svg(summary_rows)
+        self.assertIn("Top repositories by kept commits", bar)
+        self.assertIn("alpha", bar)
+
+        hist = Counter({"feat": 7, "fix": 8, "other": 9})
+        type_chart = render_commit_type_chart_svg(hist)
+        self.assertIn("Commit types breakdown", type_chart)
+        self.assertIn("feat", type_chart)
+
+        html = build_digest_html(
+            "org:o",
+            "2026-10-06",
+            "2026-10-13",
+            "UTC",
+            sections,
+            per_repo_counts={"alpha": (20, 0, 14, 1)},
+            trend=trend,
+            type_histogram=hist,
+        )
+        self.assertIn('role="presentation"', html)
+        self.assertIn("Top repositories by kept commits", html)
+        self.assertIn("Commit types breakdown", html)
+        self.assertNotIn("Repos with activity:", html)
 
     def test_full_digest_md_still_has_noise_in_full_detail(self) -> None:
         sections = self._sections()
