@@ -89,6 +89,9 @@ class LayeredSummaryTests(unittest.TestCase):
         sections = [(f"r{i}", [_commit(msg, sha=f"{i:07d}")], []) for i in range(3)]
         html = build_digest_html("org:o", "2026-09-28", "2026-10-06", "UTC", sections)
         self.assertIn("Cross-repo themes", html)
+        self.assertIn(">Theme</th>", html)
+        self.assertIn(">Authors</th>", html)
+        self.assertIn("WW-45 fan-out", html)
         self.assertIn("summary view only", html)
         self.assertNotIn("### Commits", html)
         self.assertNotIn(">r0</h2>", html)

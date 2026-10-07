@@ -52,6 +52,15 @@ HTML_TD_RIGHT_STYLE = (
 )
 
 COMMIT_TYPE_ORDER = ("feat", "fix", "chore", "ci", "docs", "release", "other")
+COMMIT_TYPE_CHART_COLORS: dict[str, str] = {
+    "feat": "#1a7f37",
+    "fix": "#cf222e",
+    "chore": "#656d76",
+    "ci": "#8250df",
+    "docs": "#0969da",
+    "release": "#bf8700",
+    "other": "#8b949e",
+}
 _COMMIT_TYPE_LABEL = re.compile(
     r"^(feat|fix|chore|ci|docs|refactor|test|build|perf|style|revert|release)(?:\([^)]+\))?!?\s*:",
     re.IGNORECASE,
@@ -472,6 +481,7 @@ class FanoutTheme:
     display_subject: str
     repo_count: int
     commit_count: int
+    author_count: int
     repos: tuple[str, ...]
     primary_author: str | None
 
@@ -505,6 +515,7 @@ def group_fanout_themes(
                 display_subject=truncate_subject(display),
                 repo_count=len(repos),
                 commit_count=len(entries),
+                author_count=len(authors),
                 repos=tuple(repos),
                 primary_author=primary_author,
             )
@@ -1521,6 +1532,232 @@ def render_trend_chart_svg(
     return "\n".join(fragments)
 
 
+def _truncate_chart_label(text: str, max_len: int = 28) -> str:
+    if len(text) <= max_len:
+        return text
+    if max_len <= 1:
+        return text[:max_len]
+    return text[: max_len - 1].rstrip() + "…"
+
+
+def render_kpi_card_strip_html(
+    summary_rows: list[tuple[str, int, int, str]],
+    org_noise_ratio: str | None,
+    *,
+    trend: SummaryTrendContext | None,
+) -> str:
+    total_commits = sum(c for _, c, _, _ in summary_rows)
+    total_tags = sum(t for _, _, t, _ in summary_rows)
+    active = len(summary_rows)
+    prior = trend.prior_kpi if trend else None
+
+    cards: list[tuple[str, str, str]] = [
+        (
+            "Active repos",
+            str(active),
+            format_wow_suffix_html(
+                wow_delta_pct(active, prior.get("active-repos") if prior else None)  # type: ignore[arg-type]
+            ),
+        ),
+        (
+            "Kept commits",
+            str(total_commits),
+            format_wow_suffix_html(
+                wow_delta_pct(total_commits, prior.get("kept-commits") if prior else None)  # type: ignore[arg-type]
+            ),
+        ),
+        (
+            "Tags",
+            str(total_tags),
+            format_wow_suffix_html(
+                wow_delta_pct(total_tags, prior.get("tags") if prior else None)  # type: ignore[arg-type]
+            ),
+        ),
+    ]
+    if org_noise_ratio is not None:
+        noise_val = parse_noise_pct(org_noise_ratio)
+        prior_noise = prior.get("noise-pct") if prior else None
+        noise_suffix = ""
+        if isinstance(prior_noise, (int, float)) and noise_val is not None:
+            noise_suffix = format_wow_suffix_html(wow_delta_pct(noise_val, prior_noise))
+        cards.append(
+            (
+                "Noise %",
+                format_noise_value_html(org_noise_ratio),
+                noise_suffix,
+            ),
+        )
+    else:
+        cards.append(("Noise %", "—", ""))
+
+    cell_style = (
+        "background:#f6f8fa; border:1px solid #d0d7de; border-radius:6px; "
+        "padding:10px 12px; vertical-align:top; width:25%;"
+    )
+    label_style = (
+        f"display:block; font-size:0.75rem; color:{HTML_COLOR_FLAT}; "
+        "text-transform:uppercase; letter-spacing:0.02em; margin-bottom:4px;"
+    )
+    value_style = "display:block; font-size:1.35rem; font-weight:600; line-height:1.2;"
+    delta_style = f"display:block; font-size:0.8rem; margin-top:4px; color:{HTML_COLOR_FLAT};"
+
+    cells: list[str] = []
+    for label, value, delta in cards:
+        delta_block = delta if delta else f'<span style="color:{HTML_COLOR_FLAT};">&nbsp;</span>'
+        cells.append(
+            f'<td style="{cell_style}">'
+            f'<span style="{label_style}">{html.escape(label)}</span>'
+            f'<span style="{value_style}">{value}</span>'
+            f'<span style="{delta_style}">{delta_block}</span>'
+            f"</td>"
+        )
+    return (
+        '<table role="presentation" cellpadding="0" cellspacing="0" '
+        'style="width:100%; max-width:640px; border-collapse:separate; '
+        'border-spacing:8px 0; margin:0 0 12px 0;">'
+        f"<tr>{''.join(cells)}</tr></table>"
+    )
+
+
+def render_top_repos_bar_chart_svg(
+    summary_rows: list[tuple[str, int, int, str]],
+    *,
+    width: int = 520,
+    max_bars: int = TOP_REPOS_SUMMARY_N,
+) -> str:
+    rows = summary_rows[:max_bars]
+    if not rows:
+        return ""
+    max_commits = max((c for _, c, _, _ in rows), default=0)
+    if max_commits <= 0:
+        return ""
+
+    label_col = 148
+    count_col = 36
+    bar_area = width - label_col - count_col - 16
+    row_h = 22
+    pad_top = 8
+    height = pad_top + len(rows) * row_h + 4
+
+    fragments: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}" role="img" '
+        f'aria-label="Top repositories by kept commits">',
+    ]
+    for idx, (repo_name, commit_count, _tags, _noise) in enumerate(rows):
+        y = pad_top + idx * row_h
+        label = html.escape(_truncate_chart_label(repo_name, 22))
+        bar_w = (commit_count / max_commits) * bar_area if max_commits else 0
+        fragments.append(
+            f'<text x="0" y="{y + 14}" fill="#1f2328" font-size="11" '
+            f'font-family="system-ui,sans-serif">{label}</text>'
+        )
+        fragments.append(
+            f'<rect x="{label_col}" y="{y + 4}" width="{bar_area:.1f}" height="14" '
+            f'fill="#eaeef2" rx="2"/>'
+        )
+        if bar_w > 0:
+            fragments.append(
+                f'<rect x="{label_col}" y="{y + 4}" width="{bar_w:.1f}" height="14" '
+                f'fill="{HTML_COLOR_CHART_COMMITS}" rx="2"/>'
+            )
+        fragments.append(
+            f'<text x="{width - 4}" y="{y + 14}" text-anchor="end" fill="#656d76" '
+            f'font-size="11" font-family="system-ui,sans-serif">{commit_count}</text>'
+        )
+    fragments.append("</svg>")
+    return "\n".join(fragments)
+
+
+def render_commit_type_chart_svg(type_counts: Counter[str]) -> str:
+    segments: list[tuple[str, int, str]] = []
+    for key in COMMIT_TYPE_ORDER:
+        count = type_counts.get(key, 0)
+        if count:
+            segments.append((key, count, COMMIT_TYPE_CHART_COLORS.get(key, "#8b949e")))
+    total = sum(c for _, c, _ in segments)
+    if total <= 0:
+        return ""
+
+    width = 520
+    bar_h = 22
+    legend_h = 14 + 8 * ((len(segments) + 3) // 4)
+    height = 36 + bar_h + legend_h
+    margin = 8
+    bar_w = width - 2 * margin
+
+    fragments: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}" role="img" aria-label="Commit types breakdown">',
+        f'<text x="{margin}" y="14" fill="#1f2328" font-size="10" font-weight="600" '
+        f'font-family="system-ui,sans-serif">{total} kept commits</text>',
+    ]
+    x = margin
+    y_bar = 22
+    for key, count, color in segments:
+        seg_w = (count / total) * bar_w
+        if seg_w <= 0:
+            continue
+        fragments.append(
+            f'<rect x="{x:.1f}" y="{y_bar}" width="{seg_w:.1f}" height="{bar_h}" fill="{color}"/>'
+        )
+        x += seg_w
+    fragments.append(
+        f'<rect x="{margin}" y="{y_bar}" width="{bar_w:.1f}" height="{bar_h}" '
+        f'fill="none" stroke="#d0d7de" stroke-width="1" rx="3"/>'
+    )
+
+    legend_y = y_bar + bar_h + 16
+    col_w = bar_w / 4
+    for idx, (key, count, color) in enumerate(segments):
+        col = idx % 4
+        row = idx // 4
+        lx = margin + col * col_w
+        ly = legend_y + row * 16
+        pct = 100.0 * count / total
+        fragments.append(f'<rect x="{lx:.1f}" y="{ly - 8}" width="8" height="8" fill="{color}" rx="1"/>')
+        fragments.append(
+            f'<text x="{lx + 12:.1f}" y="{ly}" fill="#656d76" font-size="10" '
+            f'font-family="system-ui,sans-serif">'
+            f"{html.escape(key)} {count} ({pct:.0f}%)</text>"
+        )
+    fragments.append("</svg>")
+    return "\n".join(fragments)
+
+
+def format_fanout_themes_html_table(themes: list[FanoutTheme]) -> str:
+    body: list[str] = [
+        f"<table {HTML_TABLE_STYLE}>",
+        (
+            f"<thead><tr>"
+            f'<th align="left" {HTML_TH_STYLE}>Theme</th>'
+            f'<th align="right" {HTML_TH_STYLE}>Repos</th>'
+            f'<th align="right" {HTML_TH_STYLE}>Authors</th>'
+            f'<th align="right" {HTML_TH_STYLE}>Commits</th>'
+            f"</tr></thead>"
+        ),
+        "<tbody>",
+    ]
+    for idx, theme in enumerate(themes):
+        zebra = ' style="background:#f6f8fa;"' if idx % 2 else ""
+        author_cell = str(theme.author_count)
+        if theme.primary_author:
+            author_cell = (
+                f"{theme.author_count} "
+                f'<span style="color:#656d76;">({html.escape(theme.primary_author)})</span>'
+            )
+        body.append(
+            f"<tr{zebra}>"
+            f'<td {HTML_TD_STYLE}><strong>{html.escape(theme.display_subject)}</strong></td>'
+            f'<td {HTML_TD_RIGHT_STYLE}>{theme.repo_count}</td>'
+            f'<td {HTML_TD_RIGHT_STYLE}>{author_cell}</td>'
+            f'<td {HTML_TD_RIGHT_STYLE}>{theme.commit_count}</td>'
+            f"</tr>"
+        )
+    body.extend(["</tbody>", "</table>"])
+    return "\n".join(body)
+
+
 def build_summary_text(
     since_label: str,
     until_label: str,
@@ -1671,11 +1908,13 @@ def build_digest_html(
         )
     )
 
-    activity_bits = format_activity_line_html(
-        summary_rows,
-        org_noise_raw,
-        trend=trend,
-    )
+    noise_rules_line = ""
+    if trend and trend.noise_rule_summary:
+        noise_rules_line = (
+            f'<p style="margin:0 0 12px 0; font-size:0.9rem;">'
+            f'<em style="color:{HTML_COLOR_FLAT};">Noise rules: '
+            f"{html.escape(trend.noise_rule_summary)}</em></p>"
+        )
 
     body_parts = [
         "<!DOCTYPE html>",
@@ -1691,9 +1930,11 @@ def build_digest_html(
             "padding:10px 12px; border-radius:4px; margin:0 0 12px 0;\">"
             f"<strong>TL;DR:</strong> {tldr}</p>"
         ),
-        f"<p style=\"margin:0 0 12px 0;\"><strong>Window:</strong> {window}<br>",
-        f"{activity_bits}</p>",
+        f'<p style="margin:0 0 8px 0;"><strong>Window:</strong> {window}</p>',
+        render_kpi_card_strip_html(summary_rows, org_noise_raw, trend=trend),
     ]
+    if noise_rules_line:
+        body_parts.append(noise_rules_line)
 
     if trend and trend.history:
         dates, commit_series, repo_series = build_trend_datasets(
@@ -1711,25 +1952,22 @@ def build_digest_html(
 
     if type_histogram:
         body_parts.append("<h2 style=\"font-size: 1.05rem; margin:16px 0 8px 0;\">Commit types (kept)</h2>")
+        type_chart = render_commit_type_chart_svg(type_histogram)
+        if type_chart:
+            body_parts.append(type_chart)
         body_parts.append(format_type_rollup_html_table(type_histogram))
 
     body_parts.append("<h2 style=\"font-size: 1.05rem;\">Cross-repo themes</h2>")
 
     if themes:
-        body_parts.append("<ul>")
-        for theme in themes:
-            line = (
-                f"<strong>{html.escape(theme.display_subject)}</strong> — "
-                f"{theme.repo_count} repos ({theme.commit_count} commits)"
-            )
-            if theme.primary_author:
-                line += f", {html.escape(theme.primary_author)}"
-            body_parts.append(f"<li>{line}</li>")
-        body_parts.append("</ul>")
+        body_parts.append(format_fanout_themes_html_table(themes))
     else:
         body_parts.append("<p><em>None this window.</em></p>")
 
     body_parts.append("<h2 style=\"font-size: 1.05rem;\">Top repositories</h2>")
+    top_chart = render_top_repos_bar_chart_svg(top_rows)
+    if top_chart:
+        body_parts.append(top_chart)
     body_parts.append("\n".join(_html_summary_table_rows(top_rows, include_noise=False)))
     if extra_repos:
         body_parts.append(
