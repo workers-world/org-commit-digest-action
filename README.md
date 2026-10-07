@@ -78,7 +78,7 @@ GitHub Composite Action：扫描 GitHub **org 全仓**或**单个 repo**，汇�
 有活动时生成的 digest 结构：
 
 1. **Summary（邮件/HTML 顶部，分层）**：一句 **TL;DR**；时间窗与 org KPI（有活动 repo 数、保留 commit/tag 数；`noise-filter: true` 时含 org **Noise%**）。**Cross-repo themes**：跨仓相同 subject 的 fan-out 折叠为一行（见下）。**Top repositories**：默认 Top 8 仓的 `Repo | Commits | Tags | Noise` 表，其余以「+N more repos」提示。**Highlights**：tag/release 与未折叠的 notable commits。**Full detail**（Markdown 内）：完整 Summary 表（含 Noise%）+ 下方按 repo 明细；HTML 邮件正文仅 Summary 层，不含逐仓 commit 列表。
-2. **Fan-out fold**：≥2 个 repo 出现「同一主题」commit 时，Summary 里合并为一行（主题 + repo 数 + commit 数，单作者时附作者）。匹配前先规范化 subject：去掉 conventional-commit 前缀、`WW-N` issue 键、末尾 `(#PR)`，折叠空白并小写；避免把无关 subject 并在一起。逐仓完整列表仍在 **Full detail** / CSV 中。
+2. **Fan-out fold**：≥2 个 repo 出现「同一主题」commit 时，Summary 里合并为一行（主题 + repo 数 + commit 数，单作者时附作者）。匹配前先规范化 subject：去掉 conventional-commit 前缀、`WW-N` issue 键、全角括号内的仓内限定语（如 `（sch1 试点）`）、末尾 `(#PR)`，折叠空白并小写；**保留** ASCII 括号内的语义（如 `(zizmor secrets-inherit)`），避免无关 CI 主题被并在一起。逐仓完整列表仍在 **Full detail** / CSV 中。
 3. **按 repo 明细**（Markdown **Full detail** 之后）：`Commits` 在前、`Tags` 在后；每行短 SHA、单行 subject（过长截断）、作者、按 `timezone` 格式化的日期。
 4. **发信**：`notify: true` 时 `body-file` 使用 Markdown 文件作纯文本 fallback，`html-file` 指向同次扫描生成的 HTML 文件（路径见 meta 的 `digest-html-file`，默认与 `out` 同主名、`.html` 后缀）；**另附** `commit-digest.csv`（路径见 `digest-csv-file`，默认与 `out` 同主名、`.csv` 后缀），列含窗口、repo、 type（commit|tag）、sha、name/subject、author、date，**行数与过滤后明细一致**（不受 fan-out 折叠影响）。大 HTML/CSV 不经 `GITHUB_OUTPUT` 内联，避免 `Argument list too long` 与日志泄露正文。`verbose: false` 时日志仍只打印 `digest written: ...`。
 

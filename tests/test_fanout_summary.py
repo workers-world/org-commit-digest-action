@@ -26,6 +26,12 @@ class NormalizeSubjectKeyTests(unittest.TestCase):
             normalize_subject_key("ci: zizmor secrets-inherit"),
         )
 
+    def test_strips_fullwidth_repo_qualifier_not_ascii_theme(self) -> None:
+        base = "feat(observability): 开启 Cloudflare Workers Issues (WW-45)"
+        pilot = "feat(observability): 开启 Cloudflare Workers Issues（sch1 试点）(WW-45)"
+        self.assertEqual(normalize_subject_key(base), normalize_subject_key(pilot))
+        self.assertIn("zizmor", normalize_subject_key("ci: map secrets (zizmor secrets-inherit)."))
+
     def test_does_not_merge_unrelated(self) -> None:
         self.assertNotEqual(
             normalize_subject_key("feat: add login"),

@@ -25,6 +25,7 @@ SUBJECT_MAX_LEN = 72
 TOP_REPOS_SUMMARY_N = 8
 FANOUT_MIN_REPO_COUNT = 2
 NOTABLE_COMMITS_CAP = 12
+HIGHLIGHT_TAGS_CAP = 10
 
 # Fan-out subject matching (see README): conventional prefix, WW-N keys, (#PR) suffix.
 _CONVENTIONAL_COMMIT_PREFIX = re.compile(
@@ -33,6 +34,7 @@ _CONVENTIONAL_COMMIT_PREFIX = re.compile(
 )
 _ISSUE_KEY_PATTERN = re.compile(r"\bWW-\d+\b", re.IGNORECASE)
 _TRAILING_PR_REF = re.compile(r"\s*\(#\d+\)\s*$")
+_FULLWIDTH_PAREN_QUALIFIER = re.compile(r"（[^）]*）")
 
 
 def eprint(*args: object) -> None:
@@ -418,13 +420,16 @@ def normalize_subject_key(message: str) -> str:
     """Normalize commit subject for cross-repo fan-out grouping.
 
     Heuristic: strip conventional-commit type/scope prefix, remove WW-N issue
-    keys and trailing (#123) PR refs, collapse whitespace, lowercase, trim trailing
-    periods. Two kept commits merge when keys match and they appear in at least
-    FANOUT_MIN_REPO_COUNT distinct repos (see group_fanout_themes).
+    keys, fullwidth parenthetical repo qualifiers (e.g. ``（sch1 试点）``), trailing
+    (#123) PR refs, collapse whitespace, lowercase, trim trailing periods. ASCII
+    parentheses (e.g. ``(zizmor secrets-inherit)``) are kept so distinct CI themes
+    do not merge. Two kept commits merge when keys match and they appear in at
+    least FANOUT_MIN_REPO_COUNT distinct repos (see group_fanout_themes).
     """
     text = " ".join(message.split())
     text = _CONVENTIONAL_COMMIT_PREFIX.sub("", text)
     text = _ISSUE_KEY_PATTERN.sub("", text)
+    text = _FULLWIDTH_PAREN_QUALIFIER.sub(" ", text)
     text = _TRAILING_PR_REF.sub("", text)
     text = re.sub(r"\s*\(\s*\)\s*", " ", text)
     text = re.sub(r"\s+", " ", text).strip().lower()
@@ -514,12 +519,16 @@ def collect_notable_commits(
 
 def collect_highlight_tags(
     sections: list[tuple[str, list[dict[str, str]], list[dict[str, str]]]],
-) -> list[tuple[str, dict[str, str]]]:
+    *,
+    cap: int = HIGHLIGHT_TAGS_CAP,
+) -> tuple[list[tuple[str, dict[str, str]]], int]:
     tags: list[tuple[str, dict[str, str]]] = []
     for repo_name, _commits, repo_tags in sort_sections(sections):
         for tag in repo_tags:
             tags.append((repo_name, tag))
-    return tags
+    if len(tags) <= cap:
+        return tags, 0
+    return tags[:cap], len(tags) - cap
 
 
 def split_summary_rows_top_n(
@@ -594,7 +603,7 @@ def build_layered_summary_md(
     themes = group_fanout_themes(sections)
     folded_keys = fanout_subject_keys(sections)
     notable = collect_notable_commits(sections, folded_keys=folded_keys)
-    highlight_tags = collect_highlight_tags(sections)
+    highlight_tags, extra_highlight_tags = collect_highlight_tags(sections)
     top_rows, extra_repos, extra_commits, extra_tags = split_summary_rows_top_n(summary_rows, top_n)
 
     total_commits = sum(c for _, c, _, _ in summary_rows)
@@ -644,6 +653,8 @@ def build_layered_summary_md(
                 lines.append(
                     f"- `{repo_name}` `{tag['name']}` → `{tag['sha']}` ({tag['date']})"
                 )
+            if extra_highlight_tags:
+                lines.append(f"- *+{extra_highlight_tags} more tags in Full detail / CSV*")
             lines.append("")
         if notable:
             lines.append("#### Notable commits")
@@ -857,7 +868,7 @@ def build_digest_html(
     themes = group_fanout_themes(sections)
     folded_keys = fanout_subject_keys(sections)
     notable = collect_notable_commits(sections, folded_keys=folded_keys)
-    highlight_tags = collect_highlight_tags(sections)
+    highlight_tags, extra_highlight_tags = collect_highlight_tags(sections)
     top_rows, extra_repos, extra_commits, extra_tags = split_summary_rows_top_n(summary_rows)
 
     total_commits = sum(c for _, c, _, _ in summary_rows)
@@ -925,6 +936,10 @@ def build_digest_html(
                     f"<li><code>{html.escape(repo_name)}</code> "
                     f"<code>{html.escape(tag['name'])}</code> → "
                     f"<code>{html.escape(tag['sha'])}</code> ({html.escape(tag['date'])})</li>"
+                )
+            if extra_highlight_tags:
+                body_parts.append(
+                    f"<li><em>+{extra_highlight_tags} more tags in Markdown / CSV</em></li>"
                 )
             body_parts.append("</ul>")
         if notable:
