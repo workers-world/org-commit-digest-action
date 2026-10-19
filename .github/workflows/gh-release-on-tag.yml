@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   release:
-    uses: workers-world/worker-actions/.github/workflows/create-gh-release.yml@actions/v0.2.3
+    uses: workers-world/worker-actions/.github/workflows/create-gh-release.yml@actions/v0.2.33
     secrets: inherit
     with:
       tag_name: ${{ github.ref_name }}
