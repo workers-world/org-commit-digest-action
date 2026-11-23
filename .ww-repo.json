@@ -1,0 +1,4 @@
+{
+  "type": "action",
+  "npm": "@workers-world/org-commit-digest-action"
+}
