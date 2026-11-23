@@ -1,12 +1,11 @@
 name: Promote to master
 
-# Validate 绿 → 开/复用 Release PR → auto merge（禁止直推 master）。
+# 日常发版：人工开 Release PR（dev_* → master），Validate 在 PR 上把关（含发版闸）。
+# 本 workflow 仅应急 promote（须显式指明 release_branch）。
+# 旧的自动 promote（push dev_* → Validate → workflow_run 自动合 master）已收掉：
+# 「自动合 master + bump 了才发版」会让未 bump 的合入积压 master、搭下一次发版的车出去。
 # 由 worker-promote 执行；须 Org Secret WORKERS_WORLD_GHA_TOKEN（GHA_TOKEN）。
 on:
-  workflow_run:
-    workflows: ["Validate action"]
-    types: [completed]
-    branches: ["dev_*"]
   workflow_dispatch:
     inputs:
       release_branch:
@@ -17,16 +16,11 @@ on:
 jobs:
   promote-preflight:
     permissions: {}
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       startsWith(github.event.workflow_run.head_branch, 'dev_'))
     runs-on: ubuntu-latest
     outputs:
       noop: ${{ steps.check.outputs.noop }}
     env:
-      RELEASE_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.release_branch || github.event.workflow_run.head_branch }}
+      RELEASE_BRANCH: ${{ inputs.release_branch }}
       MASTER_BRANCH: master
     steps:
       - name: Check commits to promote
@@ -73,5 +67,5 @@ jobs:
     if: needs.promote-preflight.outputs.noop != 'true'
     uses: workers-world/worker-actions/.github/workflows/worker-promote.yml@actions/v0.2.33
     with:
-      release_branch: ${{ github.event_name == 'workflow_dispatch' && inputs.release_branch || github.event.workflow_run.head_branch }}
+      release_branch: ${{ inputs.release_branch }}
     secrets: inherit
