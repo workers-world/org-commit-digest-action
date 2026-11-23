@@ -1,0 +1,7 @@
+{
+  "name": "org-commit-digest-action",
+  "version": "0.1.0",
+  "private": true,
+  "description": "workers-world org 级 GitHub Action：扫描 org/repo 提交与 tag，产出 digest.md / digest.html + CSV，可发邮件或传 Artifact",
+  "license": "MIT"
+}

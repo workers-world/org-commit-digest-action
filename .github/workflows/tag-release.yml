@@ -1,0 +1,60 @@
+# master 合入（promote PR）后读 package.json version 打 annotated v* tag → gh-release-on-tag 建 GitHub Release。
+# 版本权威 = package.json version（对齐 framework_sdk_worker / worker-actions / ww 语义）：Release PR 里本地 bump，bump 了才发；
+# 未 bump（该版本 tag 已存在）→ 跳过，不打 tag。
+name: Tag release
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/heads/master
+          fetch-depth: 0
+          token: ${{ secrets.GHA_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Create annotated v* tag from package.json
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::package.json version 须为 X.Y.Z，当前: ${VERSION}"
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          SHA="$(git rev-parse HEAD)"
+          git fetch --tags origin
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            EXISTING="$(git rev-list -n 1 "${TAG}")"
+            if [ "${EXISTING}" = "${SHA}" ]; then
+              echo "Skip tag: ${TAG} already at ${SHA}"
+            else
+              echo "Skip release: ${TAG} already exists（package.json 未 bump；在 Release PR 里 bump version 才会发新版）"
+            fi
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "refs/tags/${TAG}"
+          {
+            echo "### Released ${TAG}"
+            echo ""
+            echo "- **Tag**: \`${TAG}\` @ \`${SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Created ${TAG} at ${SHA}"

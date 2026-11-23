@@ -175,13 +175,10 @@ python3 -m unittest discover -s tests -v
 
 ## 发布
 
-与 [action-notify-email](../action-notify-email/) 相同：`dev_*` push → **Validate action** → **Promote to master**（`worker-promote` 开 Release PR 合入 `master`）。
+版本权威 = [package.json](package.json) `version`（对齐 `framework_sdk_worker` / `worker-actions` / `ww` 语义）：
 
-合入 `master` 后打消费 tag（触发 [gh-release-on-tag.yml](.github/workflows/gh-release-on-tag.yml) 建 GitHub Release 页）：
+1. Release PR（`dev_*` → `master`）里**本地 bump** `package.json` `version`
+2. 合入 `master`（Validate → Promote）后，[`tag-release.yml`](.github/workflows/tag-release.yml) 读 version 打 annotated `v*` tag；**未 bump**（该版本 tag 已存在）则跳过
+3. tag push → [`gh-release-on-tag.yml`](.github/workflows/gh-release-on-tag.yml) → GitHub Release 页
 
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-git tag -f v1 && git push origin v1 -f
-```
-
-消费方引用 `@v1`。须 Org Secret `GHA_TOKEN`（或 `WORKERS_WORLD_GHA_TOKEN`）供 promote 建/合 PR。
+消费方引用时 pin 精确 `v*` tag（如 `@v0.1.0`）；**勿**手工 `git tag -f` 维护浮动 major tag（旧 `git tag -f v1` 用法已废弃，防误改/攻陷无感知漂移）。须 Org Secret `GHA_TOKEN`（或 `WORKERS_WORLD_GHA_TOKEN`）供 promote 建/合 PR。
