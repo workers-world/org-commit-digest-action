@@ -1,4 +1,7 @@
 {
   "type": "action",
-  "npm": "@workers-world/org-commit-digest-action"
+  "npm": "@workers-world/org-commit-digest-action",
+  "deps": [
+    "worker-actions"
+  ]
 }
