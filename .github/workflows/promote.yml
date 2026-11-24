@@ -65,7 +65,7 @@ jobs:
     permissions: {}
     needs: promote-preflight
     if: needs.promote-preflight.outputs.noop != 'true'
-    uses: workers-world/worker-actions/.github/workflows/worker-promote.yml@actions/v0.2.33
+    uses: workers-world/worker-actions/.github/workflows/worker-promote.yml@actions/v0.2.68
     with:
       release_branch: ${{ inputs.release_branch }}
     secrets: inherit
