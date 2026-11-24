@@ -1,0 +1,27 @@
+# 独立 workflow：复制到 Worker 根目录 .github/workflows/sync-default-branch.yml
+# 与 ci.yml 解耦，CI 失败不影响默认分支同步。说明见 docs/release-pr-ci.md
+# workers-world actions bundle: actions/v0.2.65（禁止 @master）
+# 勿设 contents: write——改默认分支走 PAT；GITHUB_TOKEN 应保持无权限。
+name: Sync default branch
+
+on:
+  push:
+    branches: ["dev_*"]
+
+permissions: {}
+
+concurrency:
+  group: sync-default-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # 显式收紧 GITHUB_TOKEN（勿 contents: write）；PATCH default_branch 走 PAT
+    permissions: {}
+    uses: workers-world/worker-actions/.github/workflows/worker-sync-default-dev-branch.yml@actions/v0.2.65
+    secrets:
+      GHA_TOKEN: ${{ secrets.GHA_TOKEN }}
+      DEFAULT_BRANCH_BOT_PRIVATE_KEY: ${{ secrets.DEFAULT_BRANCH_BOT_PRIVATE_KEY }}
+      DEFAULT_BRANCH_BOT_APP_ID: ${{ secrets.DEFAULT_BRANCH_BOT_APP_ID }}
+    with:
+      push_branch: ${{ github.ref_name }}
