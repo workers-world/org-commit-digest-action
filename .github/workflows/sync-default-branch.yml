@@ -18,7 +18,7 @@ jobs:
   sync:
     # 显式收紧 GITHUB_TOKEN（勿 contents: write）；PATCH default_branch 走 PAT
     permissions: {}
-    uses: workers-world/worker-actions/.github/workflows/worker-sync-default-dev-branch.yml@actions/v0.2.70
+    uses: workers-world/worker-actions/.github/workflows/worker-sync-default-dev-branch.yml@actions/v0.2.71
     secrets:
       GHA_TOKEN: ${{ secrets.GHA_TOKEN }}
       DEFAULT_BRANCH_BOT_PRIVATE_KEY: ${{ secrets.DEFAULT_BRANCH_BOT_PRIVATE_KEY }}
