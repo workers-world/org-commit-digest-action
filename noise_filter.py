@@ -102,19 +102,19 @@ RULES: list[RuleCheck] = [
     ),
     (
         "R10a release_promote_empty",
-        r"^release: (dev|destin)_\d+_\d+_\d+ → master",
+        r"^release: dev_\d+_\d+_\d+ → master",
         None,
         lambda fs: not fs,
     ),
     (
         "R10b release_promote_noise_only",
-        r"^release: (dev|destin)_\d+_\d+_\d+ → master",
+        r"^release: dev_\d+_\d+_\d+ → master",
         None,
         noise_only,
     ),
     (
         "R10c release_promote_duplicate",
-        r"^release: (dev|destin)_\d+_\d+_\d+ → master",
+        r"^release: dev_\d+_\d+_\d+ → master",
         None,
         "DUP",
     ),
